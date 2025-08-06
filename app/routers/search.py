@@ -1,31 +1,44 @@
-"""Search API endpoints."""
+"""Search API endpoints with optimized error handling and logging."""
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from typing import Dict, Any
 
-from app.models.serp import SearchRequest, SearchResponse
+from app.models.serp import SearchRequest, SearchResponse, BatchPaginationRequest, BatchPaginationResponse
 from app.services.serp_service import SERPService
+from app.services.batch_pagination_service import BatchPaginationService
+from app.routers.base import BaseHandler, create_service_status_response, create_error_status_response
+from app.utils.logging_decorators import log_search_operation, log_batch_operation
 from app.clients.bright_data import (
     BrightDataError, 
     BrightDataRateLimitError, 
     BrightDataTimeoutError
 )
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Search"])
+handler = BaseHandler(router)
 
+# Setup centralized exception handling
+from app.utils.exceptions import (
+    bright_data_rate_limit_handler,
+    bright_data_timeout_handler,
+    bright_data_error_handler,
+    validation_error_handler,
+    generic_error_handler
+)
 
-async def get_serp_service() -> SERPService:
-    """Dependency injection for SERP service."""
-    service = SERPService()
-    try:
-        yield service
-    finally:
-        await service.close()
+router.add_exception_handler(BrightDataRateLimitError, bright_data_rate_limit_handler)
+router.add_exception_handler(BrightDataTimeoutError, bright_data_timeout_handler)
+router.add_exception_handler(BrightDataError, bright_data_error_handler)
+router.add_exception_handler(ValueError, validation_error_handler)
+router.add_exception_handler(Exception, generic_error_handler)
+
+# Use base handler dependencies
+get_serp_service = handler.get_serp_service
+get_batch_pagination_service = handler.get_batch_pagination_service
 
 
 @router.post(
@@ -35,6 +48,7 @@ async def get_serp_service() -> SERPService:
     summary="Perform Google Search",
     description="Perform a Google search using Bright Data SERP API and return structured results"
 )
+@log_search_operation
 async def search_google(
     search_request: SearchRequest,
     serp_service: SERPService = Depends(get_serp_service)
@@ -50,75 +64,39 @@ async def search_google(
         SearchResponse: Structured search results with organic results and metadata
         
     Raises:
-        HTTPException: For various API errors (400, 429, 500, 504)
+        HTTPException: For various API errors (handled by centralized exception handlers)
     """
-    try:
-        logger.info(f"Processing search request for query: '{search_request.query}' "
-                   f"(country: {search_request.country}, language: {search_request.language}, "
-                   f"page: {search_request.page})")
-        
-        # Perform search using SERP service
-        search_response = await serp_service.search(search_request)
-        
-        logger.info(f"Search completed successfully. Found {search_response.results_count} results")
-        
-        return search_response
-        
-    except BrightDataRateLimitError as e:
-        logger.warning(f"Rate limit exceeded: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "error": "Rate limit exceeded",
-                "message": "Too many requests. Please try again later.",
-                "type": "rate_limit_error"
-            },
-            headers={"Retry-After": "60"}
-        )
+    # Exception handling is now centralized - just focus on business logic
+    return await serp_service.search(search_request)
+
+
+@router.post(
+    "/search/pages",
+    response_model=BatchPaginationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Batch Pagination Search",
+    description="Fetch multiple pages of Google search results in a single request with concurrent processing"
+)
+@log_batch_operation
+async def search_batch_pages(
+    batch_request: BatchPaginationRequest,
+    batch_service: BatchPaginationService = Depends(get_batch_pagination_service)
+) -> BatchPaginationResponse:
+    """
+    Perform batch pagination search to fetch multiple pages concurrently.
     
-    except BrightDataTimeoutError as e:
-        logger.error(f"Request timeout: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail={
-                "error": "Request timeout",
-                "message": "The search request timed out. Please try again.",
-                "type": "timeout_error"
-            }
-        )
-    
-    except BrightDataError as e:
-        logger.error(f"Bright Data API error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={
-                "error": "External API error",
-                "message": "Error communicating with search service. Please try again later.",
-                "type": "api_error"
-            }
-        )
-    
-    except ValueError as e:
-        logger.error(f"Validation error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "Validation error",
-                "message": str(e),
-                "type": "validation_error"
-            }
-        )
-    
-    except Exception as e:
-        logger.error(f"Unexpected error during search: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "Internal server error",
-                "message": "An unexpected error occurred. Please try again later.",
-                "type": "server_error"
-            }
-        )
+    Args:
+        batch_request: Batch pagination request with search parameters
+        batch_service: Injected batch pagination service dependency
+        
+    Returns:
+        BatchPaginationResponse: Results from all fetched pages with summary metadata
+        
+    Raises:
+        HTTPException: For various API errors (handled by centralized exception handlers)
+    """
+    # Exception handling is now centralized - just focus on business logic
+    return await batch_service.fetch_batch_pages(batch_request)
 
 
 @router.get(
@@ -139,26 +117,17 @@ async def search_status() -> Dict[str, Any]:
         service = SERPService()
         await service.close()
         
-        return {
-            "status": "operational",
-            "service": "search_api",
-            "dependencies": {
+        return create_service_status_response(
+            "search_api", 
+            {
                 "bright_data": "configured",
                 "serp_service": "operational"
             }
-        }
+        )
         
     except Exception as e:
         logger.error(f"Search service status check failed: {str(e)}")
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={
-                "status": "degraded",
-                "service": "search_api",
-                "error": str(e),
-                "dependencies": {
-                    "bright_data": "unknown",
-                    "serp_service": "error"
-                }
-            }
+            content=create_error_status_response("search_api", str(e))
         )

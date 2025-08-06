@@ -8,7 +8,9 @@
       "Bash(pip install:*)",
       "Bash(python3:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "mcp__sequential-thinking"
     ],
     "deny": []
   }

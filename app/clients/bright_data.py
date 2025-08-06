@@ -84,8 +84,13 @@ class BrightDataClient:
         # Perform request with retry logic
         response_data = await self._make_request_with_retry(payload)
         
-        # Parse response using our new HTML parser
-        return self.parser.parse_html(response_data, search_request.query)
+        # Parse response using our new HTML parser with pagination metadata
+        return self.parser.parse_html(
+            response_data, 
+            search_request.query,
+            current_page=search_request.page,
+            results_per_page=search_request.results_per_page
+        )
     
     def _build_google_url(self, search_request: SearchRequest) -> str:
         """
@@ -102,7 +107,8 @@ class BrightDataClient:
             f"q={quote(search_request.query)}",
             f"gl={search_request.country.lower()}",
             f"hl={search_request.language}",
-            f"start={max(0, (search_request.page - 1) * 10)}"
+            f"start={max(0, (search_request.page - 1) * search_request.results_per_page)}",
+            f"num={search_request.results_per_page}"
         ]
         
         return f"{base_url}?{'&'.join(params)}"

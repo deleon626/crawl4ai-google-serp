@@ -12,7 +12,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup, Tag, NavigableString
 
-from app.models.serp import SearchResponse, SearchResult
+from app.models.serp import SearchResponse, SearchResult, PaginationMetadata
+from app.utils.pagination import PaginationHelper
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -88,17 +89,26 @@ class GoogleSERPParser:
     def __init__(self):
         """Initialize the parser with default configuration."""
         self.parser_name = 'html.parser'  # Use built-in parser to avoid lxml dependency
+        self.pagination_helper = PaginationHelper()
         
-    def parse_html(self, html_content: str, query: str) -> SearchResponse:
+    def parse_html(
+        self, 
+        html_content: str, 
+        query: str, 
+        current_page: int = 1,
+        results_per_page: int = 10
+    ) -> SearchResponse:
         """
         Parse Google SERP HTML and extract search results.
         
         Args:
             html_content: Raw HTML content from Google SERP
             query: Original search query
+            current_page: Current page number for pagination metadata
+            results_per_page: Expected results per page
             
         Returns:
-            SearchResponse with parsed organic results and metadata
+            SearchResponse with parsed organic results and pagination metadata
         """
         if not html_content or not html_content.strip():
             logger.warning("Empty HTML content provided")
@@ -117,15 +127,21 @@ class GoogleSERPParser:
             # Extract metadata
             metadata = self._extract_metadata(soup, html_content)
             
+            # Generate pagination metadata
+            pagination_metadata = self._generate_pagination_metadata(
+                current_page, results_per_page, len(organic_results), html_content
+            )
+            
             # Create response
             response = SearchResponse(
                 query=query,
                 results_count=len(organic_results),
                 organic_results=organic_results,
+                pagination=pagination_metadata,
                 search_metadata=metadata
             )
             
-            logger.info(f"Successfully parsed {len(organic_results)} results for query: {query}")
+            logger.info(f"Successfully parsed {len(organic_results)} results for query: {query} (page {current_page})")
             return response
             
         except Exception as e:
@@ -336,12 +352,54 @@ class GoogleSERPParser:
         except Exception:
             return False
     
-    def _create_empty_response(self, query: str, reason: str) -> SearchResponse:
+    def _generate_pagination_metadata(
+        self, 
+        current_page: int, 
+        results_per_page: int, 
+        actual_results_count: int, 
+        html_content: str
+    ) -> Optional[PaginationMetadata]:
+        """
+        Generate pagination metadata from search results and HTML content.
+        
+        Args:
+            current_page: Current page number
+            results_per_page: Expected results per page
+            actual_results_count: Actual number of results found
+            html_content: Raw HTML content to extract total results from
+            
+        Returns:
+            PaginationMetadata object or None if generation fails
+        """
+        try:
+            # Extract total results estimate from HTML content
+            total_results_estimate = self.pagination_helper.extract_total_results_from_text(html_content)
+            
+            # Generate comprehensive pagination metadata
+            pagination_metadata = self.pagination_helper.generate_pagination_metadata(
+                current_page=current_page,
+                results_per_page=results_per_page,
+                actual_results_count=actual_results_count,
+                total_results_estimate=total_results_estimate
+            )
+            
+            logger.debug(f"Generated pagination metadata: page {current_page}, "
+                        f"total estimate: {total_results_estimate}, "
+                        f"actual results: {actual_results_count}")
+            
+            return pagination_metadata
+            
+        except Exception as e:
+            logger.warning(f"Failed to generate pagination metadata: {str(e)}")
+            return None
+    
+    def _create_empty_response(self, query: str, reason: str, current_page: int = 1) -> SearchResponse:
         """Create empty response with error metadata."""
         return SearchResponse(
             query=query,
             results_count=0,
             organic_results=[],
+            pagination=None,
             search_metadata={
                 'error': reason,
                 'parser_version': '1.0.0'

@@ -47,7 +47,8 @@ class SearchAPIClient:
         query: str, 
         country: str = "US", 
         language: str = "en", 
-        page: int = 1
+        page: int = 1,
+        results_per_page: int = 10
     ) -> Dict[str, Any]:
         """
         Perform a search request.
@@ -57,6 +58,7 @@ class SearchAPIClient:
             country: Country code (ISO 3166-1 alpha-2)
             language: Language code (ISO 639-1)  
             page: Page number for pagination
+            results_per_page: Number of results per page
             
         Returns:
             Search response dictionary
@@ -68,7 +70,8 @@ class SearchAPIClient:
             "query": query,
             "country": country,
             "language": language,
-            "page": page
+            "page": page,
+            "results_per_page": results_per_page
         }
         
         logger.info(f"Searching for: '{query}' (country: {country}, language: {language}, page: {page})")
@@ -99,6 +102,75 @@ class SearchAPIClient:
         
         except httpx.RequestError as e:
             logger.error(f"Request error: {str(e)}")
+            raise
+    
+    async def search_batch_pages(
+        self,
+        query: str,
+        country: str = "US", 
+        language: str = "en",
+        max_pages: int = 3,
+        results_per_page: int = 10,
+        start_page: int = 1
+    ) -> Dict[str, Any]:
+        """
+        Perform a batch pagination search request.
+        
+        Args:
+            query: Search query string
+            country: Country code (ISO 3166-1 alpha-2)
+            language: Language code (ISO 639-1)
+            max_pages: Maximum pages to fetch
+            results_per_page: Number of results per page
+            start_page: Starting page number
+            
+        Returns:
+            Batch pagination response dictionary
+            
+        Raises:
+            httpx.HTTPError: For HTTP-related errors
+        """
+        payload = {
+            "query": query,
+            "country": country,
+            "language": language,
+            "max_pages": max_pages,
+            "results_per_page": results_per_page,
+            "start_page": start_page
+        }
+        
+        batch_endpoint = f"{self.base_url}/api/v1/search/pages"
+        
+        logger.info(f"Batch searching for: '{query}' "
+                   f"(pages {start_page}-{start_page + max_pages - 1}, "
+                   f"{results_per_page} results/page)")
+        
+        start_time = time.time()
+        
+        try:
+            response = await self.client.post(batch_endpoint, json=payload)
+            response.raise_for_status()
+            
+            search_time = time.time() - start_time
+            logger.info(f"Batch search completed in {search_time:.2f}s")
+            
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP {e.response.status_code} error: {e.response.text}")
+            try:
+                error_detail = e.response.json()
+                logger.error(f"Error details: {error_detail}")
+            except json.JSONDecodeError:
+                pass
+            raise
+        
+        except httpx.TimeoutException:
+            logger.error("Batch request timed out")
+            raise
+        
+        except httpx.RequestError as e:
+            logger.error(f"Batch request error: {str(e)}")
             raise
     
     async def get_status(self) -> Dict[str, Any]:
@@ -142,6 +214,20 @@ def print_search_results(response: Dict[str, Any]):
     print(f"Results found: {response['results_count']}")
     print(f"Search timestamp: {response['timestamp']}")
     
+    # Print pagination metadata if available
+    if response.get('pagination'):
+        pagination = response['pagination']
+        print(f"\nPagination Info:")
+        print(f"  Current page: {pagination['current_page']}")
+        print(f"  Results per page: {pagination['results_per_page']}")
+        if pagination.get('total_results_estimate'):
+            print(f"  Total results (est.): {pagination['total_results_estimate']:,}")
+        if pagination.get('total_pages_estimate'):
+            print(f"  Total pages (est.): {pagination['total_pages_estimate']:,}")
+        print(f"  Has next page: {pagination['has_next_page']}")
+        print(f"  Has previous page: {pagination['has_previous_page']}")
+        print(f"  Result range: {pagination['page_range_start']}-{pagination['page_range_end']}")
+    
     if response.get('search_metadata'):
         metadata = response['search_metadata']
         if 'search_time' in metadata:
@@ -166,6 +252,54 @@ def print_search_results(response: Dict[str, Any]):
             print(f"   Description: {description}")
     
     print(f"\n{'='*80}")
+
+
+def print_batch_pagination_results(response: Dict[str, Any]):
+    """
+    Pretty print batch pagination results.
+    
+    Args:
+        response: Batch pagination response dictionary
+    """
+    print(f"\n{'='*100}")
+    print(f"Batch Pagination Results for: '{response['query']}'")
+    print(f"Pages fetched: {response['pages_fetched']}")
+    print(f"Total results: {response['total_results']}")
+    print(f"Timestamp: {response['timestamp']}")
+    
+    if response.get('pagination_summary'):
+        summary = response['pagination_summary']
+        print(f"\nBatch Summary:")
+        print(f"  Pages requested: {summary['pages_requested']}")
+        print(f"  Pages fetched: {summary['pages_fetched']}")
+        print(f"  Success rate: {(summary['pages_fetched']/summary['pages_requested']*100):.1f}%")
+        print(f"  Page range: {summary['start_page']}-{summary['end_page']}")
+        print(f"  Results per page: {summary['results_per_page']}")
+        if summary.get('total_results_estimate'):
+            print(f"  Total results (est.): {summary['total_results_estimate']:,}")
+        if summary.get('batch_processing_time'):
+            print(f"  Processing time: {summary['batch_processing_time']:.2f}s")
+    
+    print(f"{'='*100}")
+    
+    if not response.get('pages'):
+        print("No page results found.")
+        return
+    
+    # Show summary of each page
+    for page_result in response['pages']:
+        page_num = page_result['page_number']
+        results_count = page_result['results_count']
+        
+        if results_count > 0:
+            print(f"\n📄 Page {page_num}: {results_count} results")
+            if page_result.get('organic_results'):
+                first_result = page_result['organic_results'][0]
+                print(f"    Top result: {first_result['title'][:60]}...")
+        else:
+            print(f"\n📄 Page {page_num}: No results")
+    
+    print(f"\n{'='*100}")
 
 
 async def example_basic_search(client: SearchAPIClient):
@@ -211,7 +345,7 @@ async def example_international_search(client: SearchAPIClient):
 
 async def example_pagination(client: SearchAPIClient):
     """Example of pagination through search results."""
-    print("\n📄 Example 3: Pagination")
+    print("\n📄 Example 3: Enhanced Pagination")
     print("-" * 50)
     
     query = "python programming tutorial"
@@ -219,10 +353,16 @@ async def example_pagination(client: SearchAPIClient):
     try:
         for page in [1, 2, 3]:
             print(f"\n--- Page {page} ---")
-            response = await client.search(query, page=page)
+            response = await client.search(query, page=page, results_per_page=5)
             
-            print(f"Results {(page-1)*10 + 1}-{min(page*10, response['results_count'])} "
-                  f"for '{query}'")
+            # Show pagination metadata
+            if response.get('pagination'):
+                pagination = response['pagination']
+                print(f"Page {pagination['current_page']} of ~{pagination.get('total_pages_estimate', 'unknown')}")
+                if pagination.get('total_results_estimate'):
+                    print(f"Total results estimate: {pagination['total_results_estimate']:,}")
+                print(f"Result range: {pagination['page_range_start']}-{pagination['page_range_end']}")
+                print(f"Has next: {pagination['has_next_page']}, Has previous: {pagination['has_previous_page']}")
             
             if response['organic_results']:
                 # Show first result from each page
@@ -235,6 +375,29 @@ async def example_pagination(client: SearchAPIClient):
             
     except Exception as e:
         logger.error(f"Pagination example failed: {str(e)}")
+
+
+async def example_batch_pagination(client: SearchAPIClient):
+    """Example of batch pagination functionality."""
+    print("\n🚀 Example 6: Batch Pagination")
+    print("-" * 50)
+    
+    query = "artificial intelligence"
+    
+    try:
+        print(f"Fetching pages 1-3 for '{query}' in a single batch request...")
+        
+        batch_response = await client.search_batch_pages(
+            query=query,
+            max_pages=3,
+            results_per_page=8,
+            start_page=1
+        )
+        
+        print_batch_pagination_results(batch_response)
+        
+    except Exception as e:
+        logger.error(f"Batch pagination example failed: {str(e)}")
 
 
 async def example_error_handling(client: SearchAPIClient):
@@ -297,9 +460,9 @@ async def example_service_status(client: SearchAPIClient):
         logger.error(f"Status check failed: {str(e)}")
 
 
-async def example_batch_searches(client: SearchAPIClient):
+async def example_concurrent_searches(client: SearchAPIClient):
     """Example of performing multiple searches efficiently."""
-    print("\n🚀 Example 6: Batch Searches")
+    print("\n🚀 Example 7: Concurrent Searches")
     print("-" * 50)
     
     queries = [
@@ -362,7 +525,8 @@ async def main():
             example_basic_search,
             example_international_search, 
             example_pagination,
-            example_batch_searches,
+            example_batch_pagination,
+            example_concurrent_searches,
             example_error_handling,
         ]
         
