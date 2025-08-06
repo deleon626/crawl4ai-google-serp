@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from config.settings import settings
-from app.routers import health, search
+from app.routers import health, search, crawl
 from app.clients.bright_data import (
     BrightDataError, 
     BrightDataRateLimitError, 
@@ -76,6 +76,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(health.router, prefix="/api/v1", tags=["Health"])
     app.include_router(search.router, prefix="/api/v1", tags=["Search"])
+    app.include_router(crawl.router, prefix="/api/v1", tags=["Crawl"])
     
     return app
 
