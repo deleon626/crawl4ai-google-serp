@@ -3,6 +3,16 @@
 from pydantic import BaseModel, HttpUrl, Field, field_validator, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime, UTC
+from enum import Enum
+
+
+class InstagramContentType(str, Enum):
+    """Instagram content type filtering options."""
+    
+    ALL = "all"
+    REELS = "reels"
+    POSTS = "posts"  
+    ACCOUNTS = "accounts"
 
 
 class SearchRequest(BaseModel):
@@ -13,6 +23,10 @@ class SearchRequest(BaseModel):
     language: str = Field(default="en", description="Language code for search (ISO 639-1)")
     page: int = Field(default=1, description="Page number for pagination", ge=1, le=100)
     results_per_page: int = Field(default=10, description="Results per page", ge=1, le=100)
+    instagram_content_type: InstagramContentType = Field(
+        default=InstagramContentType.ALL, 
+        description="Instagram content type filter (all, reels, posts, accounts)"
+    )
     
     @field_validator('country')
     @classmethod
@@ -131,6 +145,10 @@ class BatchPaginationRequest(BaseModel):
     max_pages: int = Field(default=3, description="Maximum pages to fetch", ge=1, le=10)
     results_per_page: int = Field(default=10, description="Results per page", ge=1, le=100)
     start_page: int = Field(default=1, description="Starting page number", ge=1)
+    instagram_content_type: InstagramContentType = Field(
+        default=InstagramContentType.ALL, 
+        description="Instagram content type filter (all, reels, posts, accounts)"
+    )
     
     @field_validator('country')
     @classmethod
@@ -171,6 +189,16 @@ class BatchPaginationSummary(BaseModel):
     batch_processing_time: Optional[float] = Field(None, description="Total time to process batch request")
 
 
+class MergedResultsMetadata(BaseModel):
+    """Metadata for merged pagination results."""
+    
+    total_merged_results: int = Field(..., description="Total number of results after merging", ge=0)
+    continuous_rank_start: int = Field(..., description="First rank number in merged results", ge=1)
+    continuous_rank_end: int = Field(..., description="Last rank number in merged results", ge=1)
+    pages_included: List[int] = Field(..., description="Page numbers that were included in the merge")
+    merge_processing_time: float = Field(..., description="Time taken to perform the merge operation in seconds")
+
+
 class BatchPaginationResponse(BaseModel):
     """Response model for batch pagination searches."""
     
@@ -179,6 +207,8 @@ class BatchPaginationResponse(BaseModel):
     pages_fetched: int = Field(..., description="Number of pages successfully fetched", ge=0)
     pagination_summary: BatchPaginationSummary = Field(..., description="Batch pagination summary")
     pages: List[PageResult] = Field(default=[], description="Results for each fetched page")
+    merged_results: List[SearchResult] = Field(default=[], description="All organic results merged with continuous ranking")
+    merged_metadata: Optional[MergedResultsMetadata] = Field(None, description="Metadata about the merge operation")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Response timestamp")
     
     model_config = ConfigDict(

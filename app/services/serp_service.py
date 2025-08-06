@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Dict, Any, Optional
 from app.clients.bright_data import BrightDataClient, BrightDataError
-from app.models.serp import SearchRequest, SearchResponse
+from app.models.serp import SearchRequest, SearchResponse, InstagramContentType
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -36,14 +36,17 @@ class SERPService:
         try:
             logger.info(f"Starting search for query: '{search_request.query}' "
                        f"(country: {search_request.country}, language: {search_request.language}, "
-                       f"page: {search_request.page})")
+                       f"page: {search_request.page}, instagram_filter: {search_request.instagram_content_type})")
             
             # Ensure client is initialized
             if not self.bright_data_client:
                 raise BrightDataError("BrightDataClient not initialized. Use SERPService as async context manager.")
             
+            # Apply Instagram content type filtering to query
+            modified_request = await self._apply_instagram_filter(search_request)
+            
             # Perform search using Bright Data client
-            search_response = await self.bright_data_client.search(search_request)
+            search_response = await self.bright_data_client.search(modified_request)
             
             # Add business logic processing
             enhanced_response = await self._enhance_search_response(
@@ -58,7 +61,10 @@ class SERPService:
             enhanced_response.search_metadata.update({
                 "search_time": round(search_time, 3),
                 "service_version": "1.0.0",
-                "enhanced_processing": True
+                "enhanced_processing": True,
+                "instagram_content_type": search_request.instagram_content_type.value,
+                "original_query": search_request.query,
+                "modified_query": modified_request.query
             })
             
             logger.info(f"Search completed in {search_time:.3f}s with "
@@ -72,6 +78,48 @@ class SERPService:
         except Exception as e:
             logger.error(f"Unexpected error in search service: {str(e)}", exc_info=True)
             raise BrightDataError(f"Search service error: {str(e)}")
+    
+    async def _apply_instagram_filter(self, search_request: SearchRequest) -> SearchRequest:
+        """
+        Apply Instagram content type filtering to search query.
+        
+        Args:
+            search_request: Original search request
+            
+        Returns:
+            Modified search request with Instagram filters applied
+        """
+        try:
+            original_query = search_request.query
+            modified_query = original_query
+            
+            # Apply Instagram content type filters
+            if search_request.instagram_content_type == InstagramContentType.REELS:
+                # Instagram Reels only: site:instagram.com inurl:"/reel/" -site:business.instagram.com
+                modified_query = f'{original_query} site:instagram.com inurl:"/reel/" -site:business.instagram.com'
+                
+            elif search_request.instagram_content_type == InstagramContentType.POSTS:
+                # Instagram Posts only: site:instagram.com inurl:"/p/" -site:business.instagram.com  
+                modified_query = f'{original_query} site:instagram.com inurl:"/p/" -site:business.instagram.com'
+                
+            elif search_request.instagram_content_type == InstagramContentType.ACCOUNTS:
+                # Instagram Accounts only: site:instagram.com -inurl:"/reel/" -inurl:"/p/" -site:business.instagram.com
+                modified_query = f'{original_query} site:instagram.com -inurl:"/reel/" -inurl:"/p/" -site:business.instagram.com'
+            
+            # For InstagramContentType.ALL, keep original query unchanged
+            
+            # Create modified request with the new query
+            modified_request = search_request.model_copy()
+            modified_request.query = modified_query
+            
+            logger.info(f"Instagram filter applied: {search_request.instagram_content_type.value} -> '{modified_query}'")
+            
+            return modified_request
+            
+        except Exception as e:
+            logger.warning(f"Error applying Instagram filter: {str(e)}")
+            # Return original request if filtering fails
+            return search_request
     
     async def _enhance_search_response(
         self, 

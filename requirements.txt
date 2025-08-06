@@ -11,3 +11,5 @@ crawl4ai>=0.7.0
 beautifulsoup4==4.12.2
 lxml==4.9.3
 cssselect==1.2.0
+streamlit==1.29.0
+requests==2.31.0

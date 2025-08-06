@@ -11,10 +11,12 @@ import time
 from typing import List, Dict, Any, Optional
 from app.models.serp import (
     SearchRequest,
+    SearchResult,
     BatchPaginationRequest,
     BatchPaginationResponse,
     BatchPaginationSummary,
-    PageResult
+    PageResult,
+    MergedResultsMetadata
 )
 from app.clients.bright_data import BrightDataClient, BrightDataError
 from app.utils.pagination import PaginationHelper
@@ -141,17 +143,23 @@ class BatchPaginationService:
             batch_processing_time=processing_time
         )
         
+        # Merge results from all pages
+        merged_results, merged_metadata = self._merge_page_results(page_results)
+        
         # Create response
         response = BatchPaginationResponse(
             query=request.query,
             total_results=total_results,
             pages_fetched=pages_fetched,
             pagination_summary=pagination_summary,
-            pages=page_results
+            pages=page_results,
+            merged_results=merged_results,
+            merged_metadata=merged_metadata
         )
         
         logger.info(f"Batch pagination completed: {pages_fetched}/{request.max_pages} pages fetched "
-                   f"in {processing_time:.2f}s ({total_results} total results)")
+                   f"in {processing_time:.2f}s ({total_results} total results, "
+                   f"{len(merged_results)} merged)")
         
         return response
     
@@ -180,11 +188,18 @@ class BatchPaginationService:
                 if self.delay_between_requests > 0:
                     await asyncio.sleep(self.delay_between_requests)
                 
-                # Fetch the page using Bright Data client
+                # Fetch the page using SERP service to ensure Instagram filtering is applied
                 if not self.bright_data_client:
                     raise RuntimeError("BrightDataClient not initialized")
                 
-                search_response = await self.bright_data_client.search(search_request)
+                # Import here to avoid circular imports
+                from app.services.serp_service import SERPService
+                
+                # Create temporary SERP service with the same client
+                temp_serp_service = SERPService()
+                temp_serp_service.bright_data_client = self.bright_data_client
+                
+                search_response = await temp_serp_service.search(search_request)
                 logger.debug(f"Successfully fetched page {page_number} "
                            f"({search_response.results_count} results)")
                 
@@ -214,13 +229,64 @@ class BatchPaginationService:
                 country=batch_request.country,
                 language=batch_request.language,
                 page=page_number,
-                results_per_page=batch_request.results_per_page
+                results_per_page=batch_request.results_per_page,
+                instagram_content_type=batch_request.instagram_content_type
             )
             
             search_requests.append(search_request)
         
         return search_requests
     
+    def _merge_page_results(self, pages: List[PageResult]) -> tuple[List[SearchResult], MergedResultsMetadata]:
+        """
+        Merge organic results from all pages into a single list with continuous ranking.
+        
+        Args:
+            pages: List of PageResult objects to merge
+            
+        Returns:
+            Tuple of (merged_results, merge_metadata)
+        """
+        merge_start_time = time.time()
+        merged_results: List[SearchResult] = []
+        continuous_rank = 1
+        pages_with_results = []
+        
+        # Sort pages by page number to ensure correct order
+        sorted_pages = sorted(pages, key=lambda p: p.page_number)
+        
+        # Extract and re-rank all organic results
+        for page in sorted_pages:
+            if page.organic_results:
+                pages_with_results.append(page.page_number)
+                
+                for result in page.organic_results:
+                    # Create new SearchResult with continuous ranking
+                    merged_result = SearchResult(
+                        rank=continuous_rank,
+                        title=result.title,
+                        url=result.url,
+                        description=result.description
+                    )
+                    merged_results.append(merged_result)
+                    continuous_rank += 1
+        
+        merge_processing_time = time.time() - merge_start_time
+        
+        # Create metadata
+        metadata = MergedResultsMetadata(
+            total_merged_results=len(merged_results),
+            continuous_rank_start=1 if merged_results else 0,
+            continuous_rank_end=continuous_rank - 1,
+            pages_included=pages_with_results,
+            merge_processing_time=merge_processing_time
+        )
+        
+        logger.debug(f"Merged {len(merged_results)} results from {len(pages_with_results)} pages "
+                    f"in {merge_processing_time:.4f}s")
+        
+        return merged_results, metadata
+
     def _validate_batch_request(self, request: BatchPaginationRequest) -> None:
         """
         Validate batch pagination request parameters.
