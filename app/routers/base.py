@@ -19,16 +19,13 @@ class BaseHandler:
     
     @staticmethod
     async def get_serp_service() -> SERPService:
-        """Dependency injection for SERP service."""
-        service = SERPService()
-        try:
+        """Dependency injection for SERP service with standardized async context management."""
+        async with SERPService() as service:
             yield service
-        finally:
-            await service.close()
     
     @staticmethod
     async def get_batch_pagination_service() -> BatchPaginationService:
-        """Dependency injection for batch pagination service."""
+        """Dependency injection for batch pagination service with standardized async context management."""
         async with BatchPaginationService() as service:
             yield service
 

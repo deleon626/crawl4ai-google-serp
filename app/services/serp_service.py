@@ -15,7 +15,7 @@ class SERPService:
     
     def __init__(self):
         """Initialize SERP service."""
-        self.bright_data_client = BrightDataClient()
+        self.bright_data_client = None
         logger.info("SERP service initialized")
     
     async def search(self, search_request: SearchRequest) -> SearchResponse:
@@ -37,6 +37,10 @@ class SERPService:
             logger.info(f"Starting search for query: '{search_request.query}' "
                        f"(country: {search_request.country}, language: {search_request.language}, "
                        f"page: {search_request.page})")
+            
+            # Ensure client is initialized
+            if not self.bright_data_client:
+                raise BrightDataError("BrightDataClient not initialized. Use SERPService as async context manager.")
             
             # Perform search using Bright Data client
             search_response = await self.bright_data_client.search(search_request)
@@ -179,11 +183,12 @@ class SERPService:
             logger.error(f"Error closing SERP service: {str(e)}")
     
     async def __aenter__(self):
-        """Async context manager entry."""
+        """Async context manager entry - initialize heavy resources."""
+        self.bright_data_client = BrightDataClient()
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
+        """Async context manager exit - cleanup resources."""
         await self.close()
 
 

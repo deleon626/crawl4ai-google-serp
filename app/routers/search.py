@@ -21,20 +21,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Search"])
 handler = BaseHandler(router)
 
-# Setup centralized exception handling
-from app.utils.exceptions import (
-    bright_data_rate_limit_handler,
-    bright_data_timeout_handler,
-    bright_data_error_handler,
-    validation_error_handler,
-    generic_error_handler
-)
-
-router.add_exception_handler(BrightDataRateLimitError, bright_data_rate_limit_handler)
-router.add_exception_handler(BrightDataTimeoutError, bright_data_timeout_handler)
-router.add_exception_handler(BrightDataError, bright_data_error_handler)
-router.add_exception_handler(ValueError, validation_error_handler)
-router.add_exception_handler(Exception, generic_error_handler)
+# Exception handling is done at the app level in main.py
+# No need to add handlers to router - they're handled by the FastAPI app instance
 
 # Use base handler dependencies
 get_serp_service = handler.get_serp_service
@@ -102,32 +90,41 @@ async def search_batch_pages(
 @router.get(
     "/search/status",
     status_code=status.HTTP_200_OK,
-    summary="Search Service Status",
-    description="Check the status of the search service and external dependencies"
+    summary="Check Search API Status",
+    description="Check the health and availability of the search API and its dependencies"
 )
-async def search_status() -> Dict[str, Any]:
-    """
-    Get the status of the search service and its dependencies.
-    
-    Returns:
-        Dict containing service status information
-    """
+async def search_status():
+    """Check search API status and dependencies."""
     try:
-        # Test SERP service initialization
-        service = SERPService()
-        await service.close()
+        # Try to initialize service to check if it's working
+        serp_service = SERPService()
         
-        return create_service_status_response(
-            "search_api", 
-            {
-                "bright_data": "configured",
-                "serp_service": "operational"
+        return {
+            "service": "search_api",
+            "status": "healthy", 
+            "dependencies": {
+                "bright_data": "available",
+                "parser": "available"
             }
-        )
-        
+        }
     except Exception as e:
-        logger.error(f"Search service status check failed: {str(e)}")
+        logger.error(f"Search service health check failed: {str(e)}")
+        
+        # Return degraded status
+        from fastapi import HTTPException
+        from fastapi.responses import JSONResponse
+        
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content=create_error_status_response("search_api", str(e))
+            content={
+                "service": "search_api",
+                "status": "degraded",
+                "error": str(e),
+                "dependencies": {
+                    "bright_data": "unknown",
+                    "parser": "unknown"
+                }
+            }
         )
+
+

@@ -2,6 +2,7 @@
 
 import logging
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,6 +21,7 @@ from app.utils.exceptions import (
     bright_data_timeout_handler,
     bright_data_error_handler,
     validation_error_handler,
+    value_error_handler,
     generic_error_handler
 )
 
@@ -29,6 +31,20 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    # Startup
+    logger.info("Starting Google SERP + Crawl4ai API")
+    logger.info(f"Debug mode: {settings.debug}")
+    logger.info(f"API documentation available at: http://{settings.host}:{settings.port}/docs")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Google SERP + Crawl4ai API")
 
 
 def create_app() -> FastAPI:
@@ -41,7 +57,8 @@ def create_app() -> FastAPI:
         debug=settings.debug,
         docs_url="/docs",
         redoc_url="/redoc",
-        openapi_url="/openapi.json"
+        openapi_url="/openapi.json",
+        lifespan=lifespan
     )
     
     # Add CORS middleware
@@ -60,19 +77,6 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api/v1", tags=["Health"])
     app.include_router(search.router, prefix="/api/v1", tags=["Search"])
     
-    # Add startup and shutdown events
-    @app.on_event("startup")
-    async def startup_event():
-        """Application startup event."""
-        logger.info("Starting Google SERP + Crawl4ai API")
-        logger.info(f"Debug mode: {settings.debug}")
-        logger.info(f"API documentation available at: http://{settings.host}:{settings.port}/docs")
-    
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """Application shutdown event."""
-        logger.info("Shutting down Google SERP + Crawl4ai API")
-    
     return app
 
 
@@ -83,8 +87,8 @@ def add_exception_handlers(app: FastAPI):
     app.add_exception_handler(BrightDataRateLimitError, bright_data_rate_limit_handler)
     app.add_exception_handler(BrightDataTimeoutError, bright_data_timeout_handler)
     app.add_exception_handler(BrightDataError, bright_data_error_handler)
-    app.add_exception_handler(ValueError, validation_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
+    app.add_exception_handler(ValueError, value_error_handler)
     app.add_exception_handler(Exception, generic_error_handler)
     
     # Keep HTTP exception handler for now (may consolidate later)

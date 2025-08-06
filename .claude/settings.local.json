@@ -10,7 +10,8 @@
       "Bash(git init:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "mcp__sequential-thinking"
+      "mcp__sequential-thinking",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

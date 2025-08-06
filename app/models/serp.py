@@ -216,7 +216,3 @@ class BatchPaginationResponse(BaseModel):
     )
 
 
-# Legacy model aliases for backward compatibility
-SearchQuery = SearchRequest
-SerpResult = SearchResult
-SerpResponse = SearchResponse

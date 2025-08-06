@@ -94,17 +94,21 @@ class TestBrightDataClient:
         with patch.object(client.client, 'post', new_callable=AsyncMock) as mock_post:
             mock_post.return_value = mock_response
             
-            # Mock the HTML parsing to return mock results
-            with patch.object(client, '_extract_organic_results') as mock_extract:
-                mock_results = [
-                    SearchResult(
-                        rank=1,
-                        title="Test Result 1",
-                        url="https://example1.com",
-                        description="Test description 1"
-                    )
-                ]
-                mock_extract.return_value = mock_results
+            # Mock the parser to return mock results
+            with patch.object(client.parser, 'parse_html') as mock_parse:
+                mock_search_response = SearchResponse(
+                    query="test query",
+                    results_count=1,
+                    organic_results=[
+                        SearchResult(
+                            rank=1,
+                            title="Test Result 1",
+                            url="https://example1.com",
+                            description="Test description 1"
+                        )
+                    ]
+                )
+                mock_parse.return_value = mock_search_response
                 
                 response = await client.search(search_request)
                 
@@ -185,7 +189,12 @@ class TestBrightDataClient:
         
         with patch.object(client.client, 'post', side_effect=mock_post):
             with patch('asyncio.sleep', new_callable=AsyncMock):  # Speed up tests
-                with patch.object(client, '_extract_organic_results', return_value=[]):
+                with patch.object(client.parser, 'parse_html') as mock_parse:
+                    mock_parse.return_value = SearchResponse(
+                        query="test query",
+                        results_count=0,
+                        organic_results=[]
+                    )
                     response = await client.search(search_request)
                     assert isinstance(response, SearchResponse)
 
@@ -199,79 +208,12 @@ class TestBrightDataClient:
                 with pytest.raises(BrightDataTimeoutError):
                     await client.search(search_request)
 
-    def test_extract_organic_results_with_pizza_content(self, client):
-        """Test HTML parsing with pizza content."""
-        html_content = "<html><body>Best pizza in town</body></html>"
-        results = client._extract_organic_results(html_content)
-        
-        assert len(results) == 2  # Mock implementation returns 2 pizza results
-        assert all(isinstance(result, SearchResult) for result in results)
-        assert results[0].rank == 1
-        assert "Pizza" in results[0].title
+    def test_parser_integration(self, client):
+        """Test that client properly uses the GoogleSERPParser."""
+        assert hasattr(client, 'parser')
+        assert client.parser is not None
+        # The actual parsing logic is tested in the parser tests
 
-    def test_extract_organic_results_no_pizza_content(self, client):
-        """Test HTML parsing without pizza content."""
-        html_content = "<html><body>Random content</body></html>"
-        results = client._extract_organic_results(html_content)
-        
-        assert len(results) == 0
-
-    def test_parse_response_success(self, client):
-        """Test response parsing success."""
-        html_content = "<html><body>pizza content</body></html>"
-        
-        response = client._parse_response(html_content, "test query")
-        
-        assert isinstance(response, SearchResponse)
-        assert response.query == "test query"
-        assert "parsed_from" in response.search_metadata
-        assert response.search_metadata["content_length"] == len(html_content)
-
-    def test_parse_response_error(self, client):
-        """Test response parsing with error."""
-        # Force an error by passing invalid data
-        with patch.object(client, '_extract_organic_results') as mock_extract:
-            mock_extract.side_effect = Exception("Parsing error")
-            
-            response = client._parse_response("content", "test query")
-            
-            assert response.query == "test query"
-            assert response.results_count == 0
-            assert len(response.organic_results) == 0
-            assert "error" in response.search_metadata
-
-    @pytest.mark.asyncio
-    async def test_legacy_search_google_method(self, client, mock_html_response):
-        """Test legacy search_google method for backward compatibility."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = mock_html_response
-        
-        with patch.object(client.client, 'post', new_callable=AsyncMock) as mock_post:
-            mock_post.return_value = mock_response
-            
-            with patch.object(client, '_extract_organic_results') as mock_extract:
-                mock_results = [
-                    SearchResult(
-                        rank=1,
-                        title="Legacy Result",
-                        url="https://example.com",
-                        description="Legacy description"
-                    )
-                ]
-                mock_extract.return_value = mock_results
-                
-                response = await client.search_google(
-                    query="legacy test",
-                    country="US",
-                    language="en",
-                    page=1
-                )
-                
-                assert response["query"] == "legacy test"
-                assert response["status"] == "success"
-                assert len(response["results"]) == 1
-                assert response["results"][0]["title"] == "Legacy Result"
 
     @pytest.mark.asyncio
     async def test_context_manager(self):

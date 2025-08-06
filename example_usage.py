@@ -53,31 +53,34 @@ async def main():
         logger.error(f"Unexpected error: {e}")
 
 
-async def legacy_example():
-    """Example using the legacy search_google method for backward compatibility."""
+async def modern_api_example():
+    """Example using the modern SearchRequest/SearchResponse API."""
     
     try:
         async with BrightDataClient() as client:
-            logger.info("Using legacy search_google method")
+            logger.info("Using modern SearchRequest API")
             
-            # Use legacy method
-            response = await client.search_google(
+            # Create search request
+            search_request = SearchRequest(
                 query="python programming",
                 country="US",
                 language="en",
                 page=1
             )
             
-            # Display legacy format results
-            logger.info(f"Legacy format - Query: {response['query']}")
-            logger.info(f"Total results: {response['total_results']}")
-            logger.info(f"Status: {response['status']}")
+            # Use modern API
+            response = await client.search(search_request)
             
-            for result in response['results']:
-                logger.info(f"Position {result['position']}: {result['title']}")
-                logger.info(f"  URL: {result['url']}")
-                if result.get('snippet'):
-                    logger.info(f"  Snippet: {result['snippet']}")
+            # Display modern format results
+            logger.info(f"Modern format - Query: {response.query}")
+            logger.info(f"Total results: {response.results_count}")
+            logger.info(f"Timestamp: {response.timestamp}")
+            
+            for result in response.organic_results:
+                logger.info(f"Rank {result.rank}: {result.title}")
+                logger.info(f"  URL: {result.url}")
+                if result.description:
+                    logger.info(f"  Description: {result.description}")
                 logger.info("")
                 
     except BrightDataError as e:
@@ -87,9 +90,9 @@ async def legacy_example():
 
 
 if __name__ == "__main__":
-    # Run the modern example
+    # Run the modern examples
     print("=== Modern API Example ===")
     asyncio.run(main())
     
-    print("\n=== Legacy API Example ===")
-    asyncio.run(legacy_example())
+    print("\n=== Modern SearchRequest API Example ===")
+    asyncio.run(modern_api_example())
