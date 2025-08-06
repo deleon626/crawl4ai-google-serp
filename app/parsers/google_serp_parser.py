@@ -122,7 +122,7 @@ class GoogleSERPParser:
             logger.debug(f"Parsed HTML content: {len(html_content)} chars")
             
             # Extract organic results
-            organic_results = self._extract_organic_results(soup)
+            organic_results = self._extract_organic_results(soup, results_per_page)
             
             # Extract metadata
             metadata = self._extract_metadata(soup, html_content)
@@ -148,18 +148,24 @@ class GoogleSERPParser:
             logger.error(f"Error parsing HTML for query '{query}': {str(e)}", exc_info=True)
             return self._create_empty_response(query, f"Parse error: {str(e)}")
     
-    def _extract_organic_results(self, soup: BeautifulSoup) -> List[SearchResult]:
+    def _extract_organic_results(self, soup: BeautifulSoup, max_results: int = 10) -> List[SearchResult]:
         """
         Extract organic search results from parsed HTML.
         
         Args:
             soup: BeautifulSoup parsed HTML
+            max_results: Maximum number of results to extract
             
         Returns:
             List of SearchResult objects
         """
         results = []
         rank = 1
+        
+        # Add safety validation for excessive result requests
+        if max_results > 200:
+            logger.warning(f"Large result request detected: {max_results}. Consider using batch pagination.")
+            max_results = 200  # Cap at reasonable limit
         
         # Try different container selectors
         containers = self._find_result_containers(soup)
@@ -170,10 +176,23 @@ class GoogleSERPParser:
             
         logger.debug(f"Found {len(containers)} potential result containers")
         
+        # Enhanced monitoring counters
+        processing_stats = {
+            'containers_processed': 0,
+            'non_organic_skipped': 0,
+            'missing_data_skipped': 0,
+            'invalid_url_skipped': 0,
+            'validation_errors': 0,
+            'successful_extractions': 0
+        }
+        
         for container in containers:
+            processing_stats['containers_processed'] += 1
             try:
                 # Skip non-organic results
                 if self._is_non_organic(container):
+                    processing_stats['non_organic_skipped'] += 1
+                    logger.debug(f"Skipping non-organic container (ads, knowledge panel, etc.)")
                     continue
                     
                 # Extract result data
@@ -183,11 +202,13 @@ class GoogleSERPParser:
                 
                 # Validate extracted data
                 if not title or not url:
-                    logger.debug(f"Skipping result {rank}: missing title or URL")
+                    processing_stats['missing_data_skipped'] += 1
+                    logger.debug(f"Skipping result {rank}: missing title or URL (title={bool(title)}, url={bool(url)})")
                     continue
                     
                 # Validate URL format
                 if not self._is_valid_url(url):
+                    processing_stats['invalid_url_skipped'] += 1
                     logger.debug(f"Skipping result {rank}: invalid URL format: {url}")
                     continue
                 
@@ -200,33 +221,96 @@ class GoogleSERPParser:
                 )
                 
                 results.append(result)
+                processing_stats['successful_extractions'] += 1
                 rank += 1
                 
-                # Limit results (Google typically shows 10 per page)
-                if rank > 20:  # Safety limit
+                # Limit results based on request parameters
+                if rank > max_results:
+                    logger.debug(f"Reached maximum results limit: {max_results}")
                     break
                     
             except Exception as e:
+                processing_stats['validation_errors'] += 1
                 logger.warning(f"Error processing result container {rank}: {str(e)}")
                 continue
         
-        logger.info(f"Extracted {len(results)} valid organic results")
+        # Enhanced logging for result extraction monitoring
+        logger.info(f"Extracted {len(results)} valid organic results from {len(containers)} containers")
+        logger.debug(f"Parser performance: {len(results)}/{max_results} requested results (extraction rate: {len(results)/max_results*100:.1f}%)")
+        
+        # Log detailed processing statistics
+        logger.debug(f"Processing breakdown:")
+        logger.debug(f"  📦 Containers processed: {processing_stats['containers_processed']}")
+        logger.debug(f"  ✅ Successful extractions: {processing_stats['successful_extractions']}")
+        logger.debug(f"  📢 Non-organic skipped: {processing_stats['non_organic_skipped']}")
+        logger.debug(f"  ❓ Missing data skipped: {processing_stats['missing_data_skipped']}")
+        logger.debug(f"  🔗 Invalid URL skipped: {processing_stats['invalid_url_skipped']}")
+        logger.debug(f"  ⚠️  Validation errors: {processing_stats['validation_errors']}")
+        
+        # Calculate processing efficiency
+        total_processed = processing_stats['containers_processed']
+        if total_processed > 0:
+            success_rate = processing_stats['successful_extractions'] / total_processed * 100
+            logger.debug(f"Container processing efficiency: {success_rate:.1f}% success rate")
+        
+        # Log result distribution details
+        if results:
+            first_rank = results[0].rank if results else 0
+            last_rank = results[-1].rank if results else 0
+            logger.debug(f"Result rank range: {first_rank}-{last_rank}")
+            
+            # Log domain diversity for quality assessment
+            domains = set()
+            for result in results:
+                try:
+                    from urllib.parse import urlparse
+                    domain = urlparse(str(result.url)).netloc
+                    domains.add(domain)
+                except:
+                    pass
+            logger.debug(f"Domain diversity: {len(domains)} unique domains in {len(results)} results")
+        
         return results
     
     def _find_result_containers(self, soup: BeautifulSoup) -> List[Tag]:
         """Find result containers using multiple selector strategies."""
         containers = []
+        selector_attempts = []
         
-        for selector in self.SELECTORS['result_containers']:
+        for i, selector in enumerate(self.SELECTORS['result_containers']):
             try:
                 found = soup.select(selector)
+                selector_attempts.append({
+                    'selector': selector,
+                    'found_count': len(found),
+                    'success': len(found) > 0
+                })
+                
                 if found:
-                    logger.debug(f"Found {len(found)} containers with selector: {selector}")
+                    logger.debug(f"✅ Found {len(found)} containers with selector: {selector} (attempt {i+1})")
                     containers = found
                     break
+                else:
+                    logger.debug(f"❌ No containers found with selector: {selector}")
+                    
             except Exception as e:
-                logger.debug(f"Selector '{selector}' failed: {str(e)}")
+                logger.debug(f"❌ Selector '{selector}' failed: {str(e)}")
+                selector_attempts.append({
+                    'selector': selector,
+                    'error': str(e),
+                    'success': False
+                })
                 continue
+        
+        # Log selector performance summary
+        successful_selectors = [s for s in selector_attempts if s.get('success', False)]
+        logger.debug(f"Container detection: {len(successful_selectors)}/{len(selector_attempts)} selectors succeeded")
+        
+        if not containers:
+            logger.warning("⚠️  No result containers found with any selector strategy")
+            # Log HTML structure hints for debugging
+            body_tags = soup.find_all(['div', 'section', 'article'], limit=10)
+            logger.debug(f"HTML structure hint: Found {len(body_tags)} potential container tags")
         
         return containers
     
