@@ -6,6 +6,14 @@ from datetime import datetime, UTC
 from enum import Enum
 
 
+class SocialPlatform(str, Enum):
+    """Social media platform filtering options."""
+    
+    NONE = "none"
+    INSTAGRAM = "instagram"
+    LINKEDIN = "linkedin"
+
+
 class InstagramContentType(str, Enum):
     """Instagram content type filtering options."""
     
@@ -13,19 +21,40 @@ class InstagramContentType(str, Enum):
     REELS = "reels"
     POSTS = "posts"  
     ACCOUNTS = "accounts"
+    TV = "tv"
+    LOCATIONS = "locations"
+
+
+class LinkedInContentType(str, Enum):
+    """LinkedIn content type filtering options."""
+    
+    ALL = "all"
+    PROFILES = "profiles"
+    COMPANIES = "companies"
+    POSTS = "posts"
+    JOBS = "jobs"
+    ARTICLES = "articles"
 
 
 class SearchRequest(BaseModel):
     """Search request model for Bright Data SERP API."""
     
     query: str = Field(..., description="Search query string", min_length=1)
-    country: str = Field(default="US", description="Country code for search (ISO 3166-1 alpha-2)")
+    country: str = Field(default="ID", description="Country code for search (ISO 3166-1 alpha-2)")
     language: str = Field(default="en", description="Language code for search (ISO 639-1)")
     page: int = Field(default=1, description="Page number for pagination", ge=1, le=100)
     results_per_page: int = Field(default=10, description="Results per page", ge=1, le=100)
+    social_platform: SocialPlatform = Field(
+        default=SocialPlatform.NONE, 
+        description="Social media platform filter (none, instagram, linkedin)"
+    )
     instagram_content_type: InstagramContentType = Field(
         default=InstagramContentType.ALL, 
-        description="Instagram content type filter (all, reels, posts, accounts)"
+        description="Instagram content type filter (all, reels, posts, accounts, tv, locations)"
+    )
+    linkedin_content_type: LinkedInContentType = Field(
+        default=LinkedInContentType.ALL, 
+        description="LinkedIn content type filter (all, profiles, companies, posts, jobs, articles)"
     )
     
     @field_validator('country')
@@ -140,14 +169,22 @@ class BatchPaginationRequest(BaseModel):
     """Request model for batch pagination searches."""
     
     query: str = Field(..., description="Search query string", min_length=1)
-    country: str = Field(default="US", description="Country code for search (ISO 3166-1 alpha-2)")
+    country: str = Field(default="ID", description="Country code for search (ISO 3166-1 alpha-2)")
     language: str = Field(default="en", description="Language code for search (ISO 639-1)")
     max_pages: int = Field(default=3, description="Maximum pages to fetch", ge=1, le=10)
     results_per_page: int = Field(default=10, description="Results per page", ge=1, le=100)
     start_page: int = Field(default=1, description="Starting page number", ge=1)
+    social_platform: SocialPlatform = Field(
+        default=SocialPlatform.NONE, 
+        description="Social media platform filter (none, instagram, linkedin)"
+    )
     instagram_content_type: InstagramContentType = Field(
         default=InstagramContentType.ALL, 
-        description="Instagram content type filter (all, reels, posts, accounts)"
+        description="Instagram content type filter (all, reels, posts, accounts, tv, locations)"
+    )
+    linkedin_content_type: LinkedInContentType = Field(
+        default=LinkedInContentType.ALL, 
+        description="LinkedIn content type filter (all, profiles, companies, posts, jobs, articles)"
     )
     
     @field_validator('country')

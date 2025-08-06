@@ -144,3 +144,14 @@ dump.rdb
 # Logs
 logs/
 *.log
+
+# Test result files
+*test_results_*.json
+*_test_*.json
+
+# Debug output files
+debug_*.html
+/tmp/google_serp_debug.html
+
+# Development tools output
+dev-tools/output/

@@ -13,7 +13,9 @@
       "mcp__sequential-thinking",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(uv run:*)",
+      "Bash(cd:*)"
     ],
     "deny": []
   }

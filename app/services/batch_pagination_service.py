@@ -71,7 +71,9 @@ class BatchPaginationService:
             BrightDataError: For API-related errors
         """
         logger.info(f"Starting batch pagination for query: '{request.query}' "
-                   f"(pages {request.start_page} to {request.start_page + request.max_pages - 1})")
+                   f"(pages {request.start_page} to {request.start_page + request.max_pages - 1}, "
+                   f"platform: {request.social_platform.value}, "
+                   f"linkedin_filter: {request.linkedin_content_type.value})")
         
         # Validate request parameters
         self._validate_batch_request(request)
@@ -230,7 +232,9 @@ class BatchPaginationService:
                 language=batch_request.language,
                 page=page_number,
                 results_per_page=batch_request.results_per_page,
-                instagram_content_type=batch_request.instagram_content_type
+                social_platform=batch_request.social_platform,
+                instagram_content_type=batch_request.instagram_content_type,
+                linkedin_content_type=batch_request.linkedin_content_type
             )
             
             search_requests.append(search_request)

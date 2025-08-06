@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Dict, Any, Optional
 from app.clients.bright_data import BrightDataClient, BrightDataError
-from app.models.serp import SearchRequest, SearchResponse, InstagramContentType
+from app.models.serp import SearchRequest, SearchResponse, SocialPlatform, InstagramContentType, LinkedInContentType
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -36,14 +36,15 @@ class SERPService:
         try:
             logger.info(f"Starting search for query: '{search_request.query}' "
                        f"(country: {search_request.country}, language: {search_request.language}, "
-                       f"page: {search_request.page}, instagram_filter: {search_request.instagram_content_type})")
+                       f"page: {search_request.page}, platform: {search_request.social_platform}, "
+                       f"ig_filter: {search_request.instagram_content_type}, li_filter: {search_request.linkedin_content_type})")
             
             # Ensure client is initialized
             if not self.bright_data_client:
                 raise BrightDataError("BrightDataClient not initialized. Use SERPService as async context manager.")
             
-            # Apply Instagram content type filtering to query
-            modified_request = await self._apply_instagram_filter(search_request)
+            # Apply social platform filtering to query
+            modified_request = await self._apply_social_platform_filter(search_request)
             
             # Perform search using Bright Data client
             search_response = await self.bright_data_client.search(modified_request)
@@ -62,7 +63,9 @@ class SERPService:
                 "search_time": round(search_time, 3),
                 "service_version": "1.0.0",
                 "enhanced_processing": True,
+                "social_platform": search_request.social_platform.value,
                 "instagram_content_type": search_request.instagram_content_type.value,
+                "linkedin_content_type": search_request.linkedin_content_type.value,
                 "original_query": search_request.query,
                 "modified_query": modified_request.query
             })
@@ -79,47 +82,83 @@ class SERPService:
             logger.error(f"Unexpected error in search service: {str(e)}", exc_info=True)
             raise BrightDataError(f"Search service error: {str(e)}")
     
-    async def _apply_instagram_filter(self, search_request: SearchRequest) -> SearchRequest:
+    async def _apply_social_platform_filter(self, search_request: SearchRequest) -> SearchRequest:
         """
-        Apply Instagram content type filtering to search query.
+        Apply social platform filtering to search query.
         
         Args:
             search_request: Original search request
             
         Returns:
-            Modified search request with Instagram filters applied
+            Modified search request with social platform filters applied
         """
         try:
             original_query = search_request.query
             modified_query = original_query
             
-            # Apply Instagram content type filters
-            if search_request.instagram_content_type == InstagramContentType.REELS:
-                # Instagram Reels only: site:instagram.com inurl:"/reel/" -site:business.instagram.com
-                modified_query = f'{original_query} site:instagram.com inurl:"/reel/" -site:business.instagram.com'
-                
-            elif search_request.instagram_content_type == InstagramContentType.POSTS:
-                # Instagram Posts only: site:instagram.com inurl:"/p/" -site:business.instagram.com  
-                modified_query = f'{original_query} site:instagram.com inurl:"/p/" -site:business.instagram.com'
-                
-            elif search_request.instagram_content_type == InstagramContentType.ACCOUNTS:
-                # Instagram Accounts only: site:instagram.com -inurl:"/reel/" -inurl:"/p/" -site:business.instagram.com
-                modified_query = f'{original_query} site:instagram.com -inurl:"/reel/" -inurl:"/p/" -site:business.instagram.com'
-            
-            # For InstagramContentType.ALL, keep original query unchanged
+            # Apply platform-specific filtering
+            if search_request.social_platform == SocialPlatform.INSTAGRAM:
+                modified_query = await self._apply_instagram_filter_logic(search_request)
+            elif search_request.social_platform == SocialPlatform.LINKEDIN:
+                modified_query = await self._apply_linkedin_filter_logic(search_request)
+            # For SocialPlatform.NONE, keep original query unchanged
             
             # Create modified request with the new query
             modified_request = search_request.model_copy()
             modified_request.query = modified_query
             
-            logger.info(f"Instagram filter applied: {search_request.instagram_content_type.value} -> '{modified_query}'")
+            # Enhanced debug logging for LinkedIn filtering issue
+            logger.info(f"FILTER DEBUG - Platform: {search_request.social_platform.value}")
+            logger.info(f"FILTER DEBUG - LinkedIn Filter Type: {search_request.linkedin_content_type.value}")
+            logger.info(f"FILTER DEBUG - Original Query: '{original_query}'")
+            logger.info(f"FILTER DEBUG - Modified Query: '{modified_query}'")
+            logger.info(f"FILTER DEBUG - Query Changed: {original_query != modified_query}")
+            
+            # Original log line
+            logger.info(f"Social platform filter applied: {search_request.social_platform.value} -> '{modified_query}'")
             
             return modified_request
             
         except Exception as e:
-            logger.warning(f"Error applying Instagram filter: {str(e)}")
+            logger.warning(f"Error applying social platform filter: {str(e)}")
             # Return original request if filtering fails
             return search_request
+    
+    async def _apply_instagram_filter_logic(self, search_request: SearchRequest) -> str:
+        """Apply Instagram-specific query modifications."""
+        original_query = search_request.query
+        
+        # Apply Instagram content type filters
+        if search_request.instagram_content_type == InstagramContentType.REELS:
+            return f'{original_query} site:instagram.com inurl:"/reel/" -site:business.instagram.com'
+        elif search_request.instagram_content_type == InstagramContentType.POSTS:
+            return f'{original_query} site:instagram.com inurl:"/p/" -site:business.instagram.com'
+        elif search_request.instagram_content_type == InstagramContentType.ACCOUNTS:
+            return f'{original_query} site:instagram.com -inurl:"/reel/" -inurl:"/p/" -inurl:"/tv/" -inurl:"/explore/" -site:business.instagram.com'
+        elif search_request.instagram_content_type == InstagramContentType.TV:
+            return f'{original_query} site:instagram.com inurl:"/tv/" -site:business.instagram.com'
+        elif search_request.instagram_content_type == InstagramContentType.LOCATIONS:
+            return f'{original_query} site:instagram.com inurl:"/explore/locations/" -site:business.instagram.com'
+        else:  # InstagramContentType.ALL
+            return f'{original_query} site:instagram.com -site:business.instagram.com'
+    
+    async def _apply_linkedin_filter_logic(self, search_request: SearchRequest) -> str:
+        """Apply LinkedIn-specific query modifications."""
+        original_query = search_request.query
+        
+        # Apply LinkedIn content type filters
+        if search_request.linkedin_content_type == LinkedInContentType.PROFILES:
+            return f'{original_query} site:linkedin.com inurl:"/in/" -inurl:"/company/" -inurl:"/jobs/" -inurl:"/posts/" -inurl:"/feed/" -inurl:"/pulse/"'
+        elif search_request.linkedin_content_type == LinkedInContentType.COMPANIES:
+            return f'{original_query} site:linkedin.com inurl:"/company/" -inurl:"/posts/" -inurl:"/feed/" -inurl:"/pulse/" -inurl:"/in/"'
+        elif search_request.linkedin_content_type == LinkedInContentType.POSTS:
+            return f'{original_query} site:linkedin.com (inurl:"/feed/" OR inurl:"/posts/") -inurl:"/company/" -inurl:"/in/" -inurl:"/jobs/" -inurl:"/pulse/"'
+        elif search_request.linkedin_content_type == LinkedInContentType.JOBS:
+            return f'{original_query} site:linkedin.com inurl:"/jobs/view/" -inurl:"/company/" -inurl:"/in/" -inurl:"/posts/" -inurl:"/feed/" -inurl:"/pulse/"'
+        elif search_request.linkedin_content_type == LinkedInContentType.ARTICLES:
+            return f'{original_query} site:linkedin.com inurl:"/pulse/" -inurl:"/company/" -inurl:"/in/" -inurl:"/posts/" -inurl:"/feed/" -inurl:"/jobs/"'
+        else:  # LinkedInContentType.ALL
+            return f'{original_query} site:linkedin.com'
     
     async def _enhance_search_response(
         self, 

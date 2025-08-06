@@ -71,8 +71,16 @@ class BrightDataClient:
         """
         logger.info(f"Performing search for query: {search_request.query}")
         
+        # Enhanced debug logging for LinkedIn filtering issue
+        logger.info(f"CLIENT DEBUG - Received Query: '{search_request.query}'")
+        logger.info(f"CLIENT DEBUG - Platform: {getattr(search_request, 'social_platform', 'N/A')}")
+        logger.info(f"CLIENT DEBUG - LinkedIn Filter: {getattr(search_request, 'linkedin_content_type', 'N/A')}")
+        
         # Build Google search URL with parameters
         google_url = self._build_google_url(search_request)
+        
+        # Log the actual URL being sent to Google
+        logger.info(f"CLIENT DEBUG - Google URL: {google_url}")
         
         # Prepare API request payload
         payload = {

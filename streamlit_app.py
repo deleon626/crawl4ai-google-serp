@@ -12,6 +12,7 @@ import traceback
 # Configuration
 API_BASE_URL = "http://localhost:8000"
 COMMON_COUNTRIES = {
+    "ID": "Indonesia",
     "US": "United States",
     "UK": "United Kingdom", 
     "DE": "Germany",
@@ -68,7 +69,8 @@ def check_search_status(api_url: str) -> Dict[str, Any]:
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-def make_single_search(api_url: str, query: str, country: str, language: str, page: int, results_per_page: int, instagram_filter: str = "all") -> Dict[str, Any]:
+def make_single_search(api_url: str, query: str, country: str, language: str, page: int, results_per_page: int, 
+                      social_platform: str = "none", instagram_filter: str = "all", linkedin_filter: str = "all") -> Dict[str, Any]:
     """Make single search API call."""
     payload = {
         "query": query,
@@ -76,7 +78,9 @@ def make_single_search(api_url: str, query: str, country: str, language: str, pa
         "language": language,
         "page": page,
         "results_per_page": results_per_page,
-        "instagram_content_type": instagram_filter
+        "social_platform": social_platform,
+        "instagram_content_type": instagram_filter,
+        "linkedin_content_type": linkedin_filter
     }
     
     try:
@@ -90,7 +94,8 @@ def make_single_search(api_url: str, query: str, country: str, language: str, pa
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-def make_batch_search(api_url: str, query: str, country: str, language: str, max_pages: int, results_per_page: int, start_page: int, instagram_filter: str = "all") -> Dict[str, Any]:
+def make_batch_search(api_url: str, query: str, country: str, language: str, max_pages: int, results_per_page: int, start_page: int, 
+                     social_platform: str = "none", instagram_filter: str = "all", linkedin_filter: str = "all") -> Dict[str, Any]:
     """Make batch search API call."""
     payload = {
         "query": query,
@@ -99,7 +104,9 @@ def make_batch_search(api_url: str, query: str, country: str, language: str, max
         "max_pages": max_pages,
         "results_per_page": results_per_page,
         "start_page": start_page,
-        "instagram_content_type": instagram_filter
+        "social_platform": social_platform,
+        "instagram_content_type": instagram_filter,
+        "linkedin_content_type": linkedin_filter
     }
     
     try:
@@ -166,65 +173,258 @@ def render_api_settings():
                     else:
                         st.error(f"❌ {result['message']}")
 
-def render_instagram_filter_section(section_key=""):
-    """Render Instagram content type filter section."""
-    st.subheader("📱 Instagram Content Filter")
+def render_social_platform_section(section_key=""):
+    """Render social platform selection and content type filtering."""
+    st.subheader("🌐 Social Platform Search")
     
-    # Create toggle buttons for Instagram content types
-    col1, col2, col3, col4 = st.columns(4)
+    # Platform Selection
+    st.write("**Platform Selection:**")
+    col1, col2, col3 = st.columns(3)
+    
+    # Initialize session state
+    if f'platform_{section_key}' not in st.session_state:
+        st.session_state[f'platform_{section_key}'] = 'none'
+    if f'ig_filter_{section_key}' not in st.session_state:
+        st.session_state[f'ig_filter_{section_key}'] = 'all'
+    if f'linkedin_filter_{section_key}' not in st.session_state:
+        st.session_state[f'linkedin_filter_{section_key}'] = 'all'
     
     with col1:
-        all_selected = st.button("🌍 All Content", 
-                                type="secondary" if st.session_state.get('ig_filter', 'all') != 'all' else "primary",
-                                key=f"ig_all_{section_key}")
-        if all_selected:
-            st.session_state.ig_filter = 'all'
+        none_selected = st.button("🌍 All Platforms", 
+                                 type="primary" if st.session_state[f'platform_{section_key}'] == 'none' else "secondary",
+                                 key=f"platform_none_{section_key}")
+        if none_selected:
+            st.session_state[f'platform_{section_key}'] = 'none'
     
     with col2:
-        reels_selected = st.button("🎬 Reels Only", 
-                                  type="secondary" if st.session_state.get('ig_filter', 'all') != 'reels' else "primary",
-                                  key=f"ig_reels_{section_key}")
-        if reels_selected:
-            st.session_state.ig_filter = 'reels'
+        ig_selected = st.button("📱 Instagram Only", 
+                               type="primary" if st.session_state[f'platform_{section_key}'] == 'instagram' else "secondary",
+                               key=f"platform_ig_{section_key}")
+        if ig_selected:
+            st.session_state[f'platform_{section_key}'] = 'instagram'
     
     with col3:
-        posts_selected = st.button("📷 Posts Only", 
-                                  type="secondary" if st.session_state.get('ig_filter', 'all') != 'posts' else "primary",
-                                  key=f"ig_posts_{section_key}")
-        if posts_selected:
-            st.session_state.ig_filter = 'posts'
+        linkedin_selected = st.button("💼 LinkedIn Only", 
+                                     type="primary" if st.session_state[f'platform_{section_key}'] == 'linkedin' else "secondary",
+                                     key=f"platform_linkedin_{section_key}")
+        if linkedin_selected:
+            st.session_state[f'platform_{section_key}'] = 'linkedin'
     
-    with col4:
-        accounts_selected = st.button("👤 Accounts Only", 
-                                     type="secondary" if st.session_state.get('ig_filter', 'all') != 'accounts' else "primary",
-                                     key=f"ig_accounts_{section_key}")
-        if accounts_selected:
-            st.session_state.ig_filter = 'accounts'
+    # Content Type Filters (shown based on platform selection)
+    if st.session_state[f'platform_{section_key}'] == 'instagram':
+        st.write("**📱 Instagram Content Filter:**")
+        render_instagram_content_filter(section_key)
+    elif st.session_state[f'platform_{section_key}'] == 'linkedin':
+        st.write("**💼 LinkedIn Content Filter:**")
+        render_linkedin_content_filter(section_key)
     
-    # Initialize default filter
-    if 'ig_filter' not in st.session_state:
-        st.session_state.ig_filter = 'all'
-    
-    # Display current filter status
-    filter_labels = {
-        'all': "🌍 All Content",
-        'reels': "🎬 Reels Only", 
-        'posts': "📷 Posts Only",
-        'accounts': "👤 Accounts Only"
+    # Display current platform status
+    platform_labels = {
+        'none': "🌍 All Platforms",
+        'instagram': "📱 Instagram Only",
+        'linkedin': "💼 LinkedIn Only"
     }
     
-    st.info(f"Active Filter: {filter_labels[st.session_state.ig_filter]}")
-    return st.session_state.ig_filter
+    current_platform = st.session_state[f'platform_{section_key}']
+    if current_platform == 'instagram':
+        ig_labels = {
+            'all': "All Content", 'reels': "Reels Only", 'posts': "Posts Only",
+            'accounts': "Accounts Only", 'tv': "TV Only", 'locations': "Locations Only"
+        }
+        content_filter = ig_labels[st.session_state[f'ig_filter_{section_key}']]
+        st.info(f"Active Filter: {platform_labels[current_platform]} → {content_filter}")
+    elif current_platform == 'linkedin':
+        linkedin_labels = {
+            'all': "All Content", 'profiles': "Profiles Only", 'companies': "Companies Only",
+            'posts': "Posts Only", 'jobs': "Jobs Only", 'articles': "Articles Only"
+        }
+        content_filter = linkedin_labels[st.session_state[f'linkedin_filter_{section_key}']]
+        st.info(f"Active Filter: {platform_labels[current_platform]} → {content_filter}")
+    else:
+        st.info(f"Active Filter: {platform_labels[current_platform]}")
+    
+    return (
+        st.session_state[f'platform_{section_key}'], 
+        st.session_state[f'ig_filter_{section_key}'], 
+        st.session_state[f'linkedin_filter_{section_key}']
+    )
+
+def generate_query_preview(original_query: str, platform: str, instagram_filter: str, linkedin_filter: str) -> tuple[str, str]:
+    """Generate query preview based on platform and filter selections."""
+    if not original_query.strip():
+        return "", "Enter a search query to see the preview"
+    
+    modified_query = original_query
+    modifier_description = "No modifications applied"
+    
+    if platform == "instagram":
+        if instagram_filter == "reels":
+            modified_query = f'{original_query} site:instagram.com inurl:"/reel/" -site:business.instagram.com'
+            modifier_description = "Instagram Reels filter: Searches only Instagram Reels content"
+        elif instagram_filter == "posts":
+            modified_query = f'{original_query} site:instagram.com inurl:"/p/" -site:business.instagram.com'
+            modifier_description = "Instagram Posts filter: Searches only Instagram Posts content"
+        elif instagram_filter == "accounts":
+            modified_query = f'{original_query} site:instagram.com -inurl:"/reel/" -inurl:"/p/" -inurl:"/tv/" -inurl:"/explore/" -site:business.instagram.com'
+            modifier_description = "Instagram Accounts filter: Searches only Instagram profile pages"
+        elif instagram_filter == "tv":
+            modified_query = f'{original_query} site:instagram.com inurl:"/tv/" -site:business.instagram.com'
+            modifier_description = "Instagram TV filter: Searches only Instagram TV content"
+        elif instagram_filter == "locations":
+            modified_query = f'{original_query} site:instagram.com inurl:"/explore/locations/" -site:business.instagram.com'
+            modifier_description = "Instagram Locations filter: Searches only Instagram location pages"
+        else:  # all
+            modified_query = f'{original_query} site:instagram.com -site:business.instagram.com'
+            modifier_description = "Instagram All Content filter: Searches all Instagram content"
+            
+    elif platform == "linkedin":
+        if linkedin_filter == "profiles":
+            modified_query = f'{original_query} site:linkedin.com inurl:"/in/" -inurl:"/company/" -inurl:"/jobs/" -inurl:"/posts/" -inurl:"/feed/" -inurl:"/pulse/"'
+            modifier_description = "LinkedIn Profiles filter: Searches only personal LinkedIn profiles (excludes posts, articles, jobs)"
+        elif linkedin_filter == "companies":
+            modified_query = f'{original_query} site:linkedin.com inurl:"/company/" -inurl:"/posts/" -inurl:"/feed/" -inurl:"/pulse/" -inurl:"/in/"'
+            modifier_description = "LinkedIn Companies filter: Searches only company LinkedIn pages (excludes posts, articles, profiles)"
+        elif linkedin_filter == "posts":
+            modified_query = f'{original_query} site:linkedin.com (inurl:"/feed/" OR inurl:"/posts/") -inurl:"/company/" -inurl:"/in/" -inurl:"/jobs/" -inurl:"/pulse/"'
+            modifier_description = "LinkedIn Posts filter: Searches only LinkedIn posts and updates (excludes companies, profiles, jobs, articles)"
+        elif linkedin_filter == "jobs":
+            modified_query = f'{original_query} site:linkedin.com inurl:"/jobs/view/" -inurl:"/company/" -inurl:"/in/" -inurl:"/posts/" -inurl:"/feed/" -inurl:"/pulse/"'
+            modifier_description = "LinkedIn Jobs filter: Searches only LinkedIn job postings (excludes companies, profiles, posts, articles)"
+        elif linkedin_filter == "articles":
+            modified_query = f'{original_query} site:linkedin.com inurl:"/pulse/" -inurl:"/company/" -inurl:"/in/" -inurl:"/posts/" -inurl:"/feed/" -inurl:"/jobs/"'
+            modifier_description = "LinkedIn Articles filter: Searches only LinkedIn articles and publications (excludes companies, profiles, posts, jobs)"
+        else:  # all
+            modified_query = f'{original_query} site:linkedin.com'
+            modifier_description = "LinkedIn All Content filter: Searches all LinkedIn content"
+    
+    return modified_query, modifier_description
+
+def render_instagram_content_filter(section_key):
+    """Render Instagram content type toggles."""
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    
+    with col1:
+        all_selected = st.button("🌍 All", 
+                                type="primary" if st.session_state[f'ig_filter_{section_key}'] == 'all' else "secondary",
+                                key=f"ig_all_{section_key}")
+        if all_selected:
+            st.session_state[f'ig_filter_{section_key}'] = 'all'
+    
+    with col2:
+        reels_selected = st.button("🎬 Reels", 
+                                  type="primary" if st.session_state[f'ig_filter_{section_key}'] == 'reels' else "secondary",
+                                  key=f"ig_reels_{section_key}")
+        if reels_selected:
+            st.session_state[f'ig_filter_{section_key}'] = 'reels'
+    
+    with col3:
+        posts_selected = st.button("📷 Posts", 
+                                  type="primary" if st.session_state[f'ig_filter_{section_key}'] == 'posts' else "secondary",
+                                  key=f"ig_posts_{section_key}")
+        if posts_selected:
+            st.session_state[f'ig_filter_{section_key}'] = 'posts'
+    
+    with col4:
+        accounts_selected = st.button("👤 Accounts", 
+                                     type="primary" if st.session_state[f'ig_filter_{section_key}'] == 'accounts' else "secondary",
+                                     key=f"ig_accounts_{section_key}")
+        if accounts_selected:
+            st.session_state[f'ig_filter_{section_key}'] = 'accounts'
+    
+    with col5:
+        tv_selected = st.button("📺 TV", 
+                               type="primary" if st.session_state[f'ig_filter_{section_key}'] == 'tv' else "secondary",
+                               key=f"ig_tv_{section_key}")
+        if tv_selected:
+            st.session_state[f'ig_filter_{section_key}'] = 'tv'
+    
+    with col6:
+        locations_selected = st.button("📍 Locations", 
+                                      type="primary" if st.session_state[f'ig_filter_{section_key}'] == 'locations' else "secondary",
+                                      key=f"ig_locations_{section_key}")
+        if locations_selected:
+            st.session_state[f'ig_filter_{section_key}'] = 'locations'
+
+def render_linkedin_content_filter(section_key):
+    """Render LinkedIn content type toggles."""
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    
+    with col1:
+        all_selected = st.button("🌍 All", 
+                                type="primary" if st.session_state[f'linkedin_filter_{section_key}'] == 'all' else "secondary",
+                                key=f"linkedin_all_{section_key}")
+        if all_selected:
+            st.session_state[f'linkedin_filter_{section_key}'] = 'all'
+    
+    with col2:
+        profiles_selected = st.button("👤 Profiles", 
+                                     type="primary" if st.session_state[f'linkedin_filter_{section_key}'] == 'profiles' else "secondary",
+                                     key=f"linkedin_profiles_{section_key}")
+        if profiles_selected:
+            st.session_state[f'linkedin_filter_{section_key}'] = 'profiles'
+    
+    with col3:
+        companies_selected = st.button("🏢 Companies", 
+                                      type="primary" if st.session_state[f'linkedin_filter_{section_key}'] == 'companies' else "secondary",
+                                      key=f"linkedin_companies_{section_key}")
+        if companies_selected:
+            st.session_state[f'linkedin_filter_{section_key}'] = 'companies'
+    
+    with col4:
+        posts_selected = st.button("📝 Posts", 
+                                  type="primary" if st.session_state[f'linkedin_filter_{section_key}'] == 'posts' else "secondary",
+                                  key=f"linkedin_posts_{section_key}")
+        if posts_selected:
+            st.session_state[f'linkedin_filter_{section_key}'] = 'posts'
+    
+    with col5:
+        jobs_selected = st.button("💼 Jobs", 
+                                 type="primary" if st.session_state[f'linkedin_filter_{section_key}'] == 'jobs' else "secondary",
+                                 key=f"linkedin_jobs_{section_key}")
+        if jobs_selected:
+            st.session_state[f'linkedin_filter_{section_key}'] = 'jobs'
+    
+    with col6:
+        articles_selected = st.button("📄 Articles", 
+                                     type="primary" if st.session_state[f'linkedin_filter_{section_key}'] == 'articles' else "secondary",
+                                     key=f"linkedin_articles_{section_key}")
+        if articles_selected:
+            st.session_state[f'linkedin_filter_{section_key}'] = 'articles'
 
 def render_single_search_form():
     """Render single search form."""
     st.subheader("🔍 Single Search")
     
-    # Instagram filter section
-    instagram_filter = render_instagram_filter_section("single")
+    # Social platform filter section
+    platform, instagram_filter, linkedin_filter = render_social_platform_section("single")
     
     # Query input
     query = st.text_input("Search Query", value="", placeholder="Enter your search query...")
+    
+    # Query Preview Section
+    if query:
+        st.subheader("🔍 Query Modifier Preview")
+        modified_query, description = generate_query_preview(query, platform, instagram_filter, linkedin_filter)
+        
+        # Display original vs modified query
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Original Query:**")
+            st.code(query, language="text")
+        with col2:
+            st.write("**Modified Query:**")
+            st.code(modified_query, language="text")
+        
+        # Description
+        st.info(f"📝 {description}")
+        
+        # Google Search URL
+        if modified_query:
+            google_url = f"https://www.google.com/search?q={modified_query.replace(' ', '+')}"
+            st.write("**🔗 Direct Google Search URL:**")
+            st.text(google_url)
+        
+        st.divider()
     
     # Location and language settings
     col1, col2 = st.columns(2)
@@ -237,7 +437,7 @@ def render_single_search_form():
         )
         
         if country_option == "Custom":
-            country = st.text_input("Country Code", value="US", max_chars=2, help="2-letter uppercase ISO code")
+            country = st.text_input("Country Code", value="ID", max_chars=2, help="2-letter uppercase ISO code")
         else:
             country = country_option
         
@@ -266,12 +466,14 @@ def render_single_search_form():
     with col3:
         page = st.number_input("Page", min_value=1, max_value=100, value=1)
     with col4:
-        results_per_page = st.number_input("Results per Page", min_value=1, max_value=100, value=10)
+        results_per_page_options = [10, 20, 50, 100]
+        results_per_page = st.selectbox("Results per Page", results_per_page_options, index=3)  # Default to 100
     
     # Search button
     if st.button("🚀 Search", type="primary", disabled=not query or not validate_country_code(country) or not validate_language_code(language)):
         with st.spinner("Searching..."):
-            result = make_single_search(st.session_state.api_url, query, country, language, page, results_per_page, instagram_filter)
+            result = make_single_search(st.session_state.api_url, query, country, language, page, results_per_page, 
+                                      platform, instagram_filter, linkedin_filter)
             st.session_state.last_search_results = result
     
     # Display results
@@ -282,11 +484,36 @@ def render_batch_search_form():
     """Render batch search form."""
     st.subheader("📄 Batch Search")
     
-    # Instagram filter section (shared with single search)
-    instagram_filter = render_instagram_filter_section("batch")
+    # Social platform filter section
+    platform, instagram_filter, linkedin_filter = render_social_platform_section("batch")
     
     # Query input
     query = st.text_input("Search Query", value="", placeholder="Enter your search query...", key="batch_query")
+    
+    # Query Preview Section
+    if query:
+        st.subheader("🔍 Query Modifier Preview")
+        modified_query, description = generate_query_preview(query, platform, instagram_filter, linkedin_filter)
+        
+        # Display original vs modified query
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Original Query:**")
+            st.code(query, language="text")
+        with col2:
+            st.write("**Modified Query:**")
+            st.code(modified_query, language="text")
+        
+        # Description
+        st.info(f"📝 {description}")
+        
+        # Google Search URL
+        if modified_query:
+            google_url = f"https://www.google.com/search?q={modified_query.replace(' ', '+')}"
+            st.write("**🔗 Direct Google Search URL:**")
+            st.text(google_url)
+        
+        st.divider()
     
     # Location and language settings
     col1, col2 = st.columns(2)
@@ -300,7 +527,7 @@ def render_batch_search_form():
         )
         
         if country_option == "Custom":
-            country = st.text_input("Country Code", value="US", max_chars=2, help="2-letter uppercase ISO code", key="batch_country_custom")
+            country = st.text_input("Country Code", value="ID", max_chars=2, help="2-letter uppercase ISO code", key="batch_country_custom")
         else:
             country = country_option
         
@@ -328,16 +555,18 @@ def render_batch_search_form():
     # Batch settings
     col3, col4, col5 = st.columns(3)
     with col3:
-        max_pages = st.number_input("Max Pages", min_value=1, max_value=10, value=3)
+        max_pages = st.number_input("Max Pages", min_value=1, max_value=3, value=3)
     with col4:
         start_page = st.number_input("Start Page", min_value=1, max_value=100, value=1)
     with col5:
-        results_per_page = st.number_input("Results per Page", min_value=1, max_value=100, value=10, key="batch_results_per_page")
+        results_per_page_options = [10, 20, 50, 100]
+        results_per_page = st.selectbox("Results per Page", results_per_page_options, index=3, key="batch_results_per_page")  # Default to 100
     
     # Search button
     if st.button("🚀 Batch Search", type="primary", disabled=not query or not validate_country_code(country) or not validate_language_code(language)):
         with st.spinner(f"Searching {max_pages} pages..."):
-            result = make_batch_search(st.session_state.api_url, query, country, language, max_pages, results_per_page, start_page, instagram_filter)
+            result = make_batch_search(st.session_state.api_url, query, country, language, max_pages, results_per_page, start_page, 
+                                      platform, instagram_filter, linkedin_filter)
             st.session_state.last_batch_results = result
     
     # Display results
@@ -366,11 +595,22 @@ def render_search_results(result: Dict[str, Any], search_type: str):
     with col3:
         st.metric("Timestamp", data["timestamp"][:19])
     with col4:
-        # Show Instagram filter if available in metadata
-        ig_filter = "N/A"
-        if data.get("search_metadata") and "instagram_content_type" in data["search_metadata"]:
-            ig_filter = data["search_metadata"]["instagram_content_type"].title()
-        st.metric("Instagram Filter", ig_filter)
+        # Show active platform and filter if available in metadata
+        platform_info = "N/A"
+        if data.get("search_metadata"):
+            metadata = data["search_metadata"]
+            platform = metadata.get("social_platform", "none")
+            
+            if platform == "instagram":
+                ig_filter = metadata.get("instagram_content_type", "all").title()
+                platform_info = f"📱 IG: {ig_filter}"
+            elif platform == "linkedin":
+                li_filter = metadata.get("linkedin_content_type", "all").title()
+                platform_info = f"💼 LI: {li_filter}"
+            else:
+                platform_info = "🌍 All Platforms"
+        
+        st.metric("Platform Filter", platform_info)
     
     # Pagination info
     if "pagination" in data and data["pagination"]:
@@ -421,13 +661,24 @@ def render_batch_results(result: Dict[str, Any]):
     with col4:
         st.metric("Processing Time", f"{data['pagination_summary'].get('batch_processing_time', 0):.2f}s")
     with col5:
-        # Show Instagram filter from first page's metadata if available
-        ig_filter = "N/A"
+        # Show platform filter from first page's metadata if available
+        platform_info = "N/A"
         if data.get("pages") and len(data["pages"]) > 0:
             first_page = data["pages"][0]
-            if first_page.get("search_metadata") and "instagram_content_type" in first_page["search_metadata"]:
-                ig_filter = first_page["search_metadata"]["instagram_content_type"].title()
-        st.metric("Instagram Filter", ig_filter)
+            if first_page.get("search_metadata"):
+                metadata = first_page["search_metadata"]
+                platform = metadata.get("social_platform", "none")
+                
+                if platform == "instagram":
+                    ig_filter = metadata.get("instagram_content_type", "all").title()
+                    platform_info = f"📱 IG: {ig_filter}"
+                elif platform == "linkedin":
+                    li_filter = metadata.get("linkedin_content_type", "all").title()
+                    platform_info = f"💼 LI: {li_filter}"
+                else:
+                    platform_info = "🌍 All Platforms"
+        
+        st.metric("Platform Filter", platform_info)
     
     # Pages summary
     summary = data["pagination_summary"]

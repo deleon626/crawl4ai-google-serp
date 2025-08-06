@@ -40,8 +40,25 @@ if [[ ! -f "streamlit_app.py" ]]; then
     exit 1
 fi
 
-echo "📦 Installing/checking dependencies..."
-uv pip install -r requirements.txt --quiet
+echo "📦 Setting up environment..."
+
+# Check if virtual environment exists, create if not
+if [[ ! -d ".venv" ]]; then
+    echo "   Creating virtual environment with UV..."
+    uv venv
+fi
+
+# Install dependencies
+echo "   Installing dependencies..."
+if ! uv pip install -r requirements.txt --quiet; then
+    echo "⚠️  Dependency conflict detected. Trying to resolve..."
+    echo "   This might take a moment..."
+    uv pip install -r requirements.txt --resolution=highest || {
+        echo "❌ Failed to install dependencies. Please check requirements.txt"
+        echo "   Try manually: uv pip install -r requirements.txt"
+        exit 1
+    }
+fi
 
 echo ""
 echo "🔧 Starting FastAPI backend..."
@@ -66,8 +83,10 @@ FRONTEND_PID=$!
 echo ""
 echo "✅ Both services are starting up..."
 echo "=================================="
-echo "📱 Instagram Content Filtering Available:"
-echo "   🌍 All Content  🎬 Reels Only  📷 Posts Only  👤 Accounts Only"
+echo "🌐 Multi-Platform Social Media Search:"
+echo "   📱 Instagram: All, Reels, Posts, Accounts, TV, Locations (6 filters)"
+echo "   💼 LinkedIn: All, Profiles, Companies, Posts, Jobs, Articles (6 filters)"
+echo "   🔍 Query Preview: Real-time modified query display with Google URLs"
 echo ""
 echo "🌐 URLs:"
 echo "   • Streamlit Frontend: http://localhost:8501"
