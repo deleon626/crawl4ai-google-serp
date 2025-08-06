@@ -33,18 +33,14 @@ pytest --cov=app
 pytest tests/test_bright_data.py::TestBrightDataClient::test_search_success
 
 # Phase 2 Integration Testing
-python test_phase2_integration.py
+python scripts/test_phase2_integration.py
 
 # Phase 2.5 Integration Testing  
-python test_phase25_integration.py
+python scripts/test_phase25_integration.py
 
 # Run individual test scripts
-python test_direct_api.py
-python test_parser.py
-python test_pagination_accuracy.py
-python test_indonesia_fashion.py
-python test_batch_linkedin.py
-python test_linkedin_queries.py
+python scripts/test_batch_linkedin.py
+python scripts/test_linkedin_queries.py
 
 # New Phase 2 test files
 pytest tests/test_crawl4ai_client.py
@@ -76,13 +72,14 @@ cp .env.example .env
 run.bat        # Windows - starts both backend and frontend
 
 # Run examples
-python example_search.py
-python example_usage.py
+python examples/example_search.py
+python examples/example_usage.py
+python examples/demo_query_preview.py
 
 # Start services individually
-streamlit run streamlit_app.py                    # Original single-page frontend
-streamlit run streamlit_multipage_app.py          # Single-file multipage frontend (radio buttons)
-streamlit run 🏠_Home.py                          # Native multipage frontend (recommended)
+streamlit run frontend/streamlit_app.py           # Original single-page frontend
+streamlit run frontend/streamlit_multipage_app.py # Single-file multipage frontend (radio buttons)
+streamlit run frontend/🏠_Home.py                 # Native multipage frontend (recommended)
 ```
 
 ## Code Architecture
@@ -163,12 +160,62 @@ Structured logging with operation decorators for request/response tracking and p
 **Phase 3**: Planned - Workflow Strategy Engine with parallel search execution
 **Phase 4**: Planned - Redis caching and performance optimization
 
+## Project Structure
+
+```
+crawl4ai_GoogleSERP/
+├── README.md                    # Main project documentation
+├── CLAUDE.md                    # Claude Code instructions
+├── main.py                      # FastAPI application entry point
+├── requirements.txt             # Python dependencies
+├── pytest.ini                  # Test configuration
+├── run.sh, run.bat             # Launch scripts
+│
+├── app/                        # Core application code
+│   ├── clients/                # External API clients
+│   ├── models/                 # Pydantic data models
+│   ├── parsers/                # HTML parsing utilities
+│   ├── routers/                # FastAPI route handlers
+│   ├── services/               # Business logic services
+│   └── utils/                  # Shared utilities
+│
+├── config/                     # Configuration management
+├── tests/                      # Unit and integration tests
+│
+├── examples/                   # Example usage scripts
+│   ├── example_search.py
+│   ├── example_usage.py
+│   └── demo_query_preview.py
+│
+├── scripts/                    # Debug and utility scripts
+│   ├── debug_linkedin_filter.py
+│   ├── test_batch_linkedin.py
+│   ├── test_linkedin_queries.py
+│   ├── test_phase2_integration.py
+│   └── test_phase25_integration.py
+│
+├── frontend/                   # Streamlit web applications
+│   ├── streamlit_app.py        # Single-page frontend
+│   ├── streamlit_multipage_app.py # Multi-page frontend (radio buttons)
+│   ├── 🏠_Home.py             # Native multi-page frontend (recommended)
+│   └── pages/                  # Streamlit page components
+│
+├── docs/                       # Project documentation
+│   ├── development/            # Development guides and summaries
+│   ├── references/             # Technical references
+│   └── implementation/         # Implementation reports
+│
+└── dev-tools/                  # Development utilities
+    └── debug_html.py
+```
+
 ## Available Frontends
-- **Streamlit App**: `streamlit run streamlit_app.py` - Interactive web UI for testing search functionality  
-- **Multipage App**: `streamlit run streamlit_multipage_app.py` - Enhanced UI with multi-platform social media search
+- **Single-page App**: `streamlit run frontend/streamlit_app.py` - Basic web UI for testing search functionality
+- **Multi-page App**: `streamlit run frontend/streamlit_multipage_app.py` - Enhanced UI with radio button navigation
+- **Native Multi-page**: `streamlit run frontend/🏠_Home.py` - Full multi-page app with sidebar navigation (recommended)
 - **Launcher Scripts**: `./run.sh` or `run.bat` - Start both backend and frontend simultaneously
-- **Example Scripts**: Direct API usage examples for development and testing
-- **Integration Tests**: `python test_phase2_integration.py` - Comprehensive content analysis testing
+- **Example Scripts**: Direct API usage examples in `examples/` directory
+- **Integration Tests**: Scripts in `scripts/` directory for comprehensive testing
 
 ## API Endpoints
 ### Core SERP Endpoints

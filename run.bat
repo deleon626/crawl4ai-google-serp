@@ -21,8 +21,8 @@ if not exist "main.py" (
     exit /b 1
 )
 
-if not exist "streamlit_app.py" (
-    echo ❌ streamlit_app.py not found. Make sure you're in the project root directory.
+if not exist "frontend\streamlit_app.py" (
+    echo ❌ frontend\streamlit_app.py not found. Make sure you're in the project root directory.
     pause
     exit /b 1
 )
@@ -60,4 +60,4 @@ echo 💡 Press Ctrl+C to stop all services
 echo ==================================
 
 REM Start Streamlit frontend (this will block)
-uv run streamlit run streamlit_app.py --server.headless true --server.runOnSave true
+uv run streamlit run frontend\streamlit_app.py --server.headless true --server.runOnSave true

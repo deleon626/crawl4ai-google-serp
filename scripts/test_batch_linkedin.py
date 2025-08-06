@@ -6,7 +6,7 @@ Test LinkedIn filtering with batch search.
 import asyncio
 import sys
 import os
-sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.models.serp import BatchPaginationRequest, SocialPlatform, LinkedInContentType
 from app.services.batch_pagination_service import BatchPaginationService

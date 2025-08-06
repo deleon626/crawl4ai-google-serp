@@ -7,6 +7,9 @@ This script demonstrates how to use the BrightDataClient to perform Google searc
 
 import asyncio
 import logging
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.clients.bright_data import BrightDataClient, BrightDataError
 from app.models.serp import SearchRequest
 

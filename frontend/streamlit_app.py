@@ -150,7 +150,9 @@ def render_header():
     
     with col2:
         if st.session_state.connection_status:
-            if st.session_state.connection_status["status"] == "success":
+            # Handle both old and new response formats
+            if (st.session_state.connection_status.get("status") == "success" or 
+                st.session_state.connection_status.get("success") == True):
                 st.success("🟢 Connected")
             else:
                 st.error("🔴 Disconnected")
@@ -178,10 +180,10 @@ def render_api_settings():
                 with st.spinner("Testing connection..."):
                     result = test_api_connection(st.session_state.api_url)
                     st.session_state.connection_status = result
-                    if result["status"] == "success":
+                    if result.get("status") == "success":
                         st.success("✅ Connection successful!")
                     else:
-                        st.error(f"❌ {result['message']}")
+                        st.error(f"❌ {result.get('message', 'Connection failed')}")
 
 def render_social_platform_section(section_key=""):
     """Render social platform selection and content type filtering."""

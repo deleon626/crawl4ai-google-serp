@@ -267,49 +267,139 @@ def render_instagram_analysis_page():
         result = st.session_state.instagram_results
         
         if result["success"]:
-            data = result["data"]
+            # Fix data structure access - API returns 'result' not 'data'
+            analysis_result = result.get("data", {}).get("result", {}) if "data" in result else result.get("result", {})
             st.success("✅ Instagram analysis completed!")
             
             # Business Indicators
-            if data.get("business_analysis"):
-                business = data["business_analysis"]
+            if analysis_result.get("business_analysis"):
+                business = analysis_result["business_analysis"]
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Business Confidence", f"{business.get('confidence_score', 0):.2f}")
+                    st.metric("Business Confidence", f"{business.get('confidence', 0):.2f}")
                 with col2:
                     st.metric("Is Business", "✅" if business.get('is_business') else "❌")
                 with col3:
-                    st.metric("Contact Methods", len(business.get('contact_methods', [])))
+                    # Count contact info items from extracted_data
+                    contact_count = 0
+                    if business.get('extracted_data'):
+                        extracted = business['extracted_data']
+                        contact_count = (len(extracted.get('emails', [])) + 
+                                       len(extracted.get('phones', [])) + 
+                                       len(extracted.get('websites', [])))
+                    st.metric("Contact Methods", contact_count)
                 
+                # Business Indicators
                 if business.get('indicators'):
                     st.subheader("Business Indicators")
-                    indicators_df = pd.DataFrame(business['indicators'])
-                    st.dataframe(indicators_df)
+                    indicators = business['indicators']
+                    
+                    # Display indicators in structured format
+                    if indicators.get('contact_info'):
+                        st.write("**Contact Information Found:**")
+                        for item in indicators['contact_info']:
+                            st.write(f"- {item}")
+                    
+                    if indicators.get('business_signals'):
+                        st.write("**Business Signals:**")
+                        for signal in indicators['business_signals']:
+                            st.write(f"- {signal}")
+                    
+                    if indicators.get('professional_markers'):
+                        st.write("**Professional Markers:**")
+                        for marker in indicators['professional_markers']:
+                            st.write(f"- {marker}")
+                    
+                    if indicators.get('location_info'):
+                        st.write("**Location Information:**")
+                        for location in indicators['location_info']:
+                            st.write(f"- {location}")
+                
+                # Extracted Contact Data
+                if business.get('extracted_data'):
+                    extracted = business['extracted_data']
+                    st.subheader("Extracted Contact Information")
+                    
+                    contact_col1, contact_col2 = st.columns(2)
+                    with contact_col1:
+                        if extracted.get('emails'):
+                            st.write("**Email Addresses:**")
+                            for email in extracted['emails']:
+                                st.write(f"- {email}")
+                        
+                        if extracted.get('phones'):
+                            st.write("**Phone Numbers:**")
+                            for phone in extracted['phones']:
+                                st.write(f"- {phone}")
+                    
+                    with contact_col2:
+                        if extracted.get('websites'):
+                            st.write("**Websites:**")
+                            for website in extracted['websites']:
+                                st.write(f"- [{website}]({website})")
+                        
+                        if extracted.get('social_handles'):
+                            st.write("**Social Media Handles:**")
+                            for handle in extracted['social_handles']:
+                                st.write(f"- {handle}")
             
             # Link Analysis
-            if data.get("link_analysis"):
-                links = data["link_analysis"]
+            if analysis_result.get("link_analysis"):
+                links = analysis_result["link_analysis"]
                 st.subheader("Link Analysis")
                 
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Total Links", links.get('total_links', 0))
                 with col2:
-                    st.metric("Business Links", links.get('business_relevant_count', 0))
+                    st.metric("Business Links", len(links.get('business_links', [])))
+                with col3:
+                    st.metric("Website Links", len(links.get('website_links', [])))
                 
-                if links.get('categorized_links'):
-                    for category, category_links in links['categorized_links'].items():
-                        if category_links:
-                            st.write(f"**{category.title()}:**")
-                            for link in category_links:
-                                st.write(f"- [{link.get('text', 'Link')}]({link.get('url', '#')})")
+                # Display different types of links
+                link_types = [
+                    ('business_links', 'Business Links'),
+                    ('website_links', 'Website Links'),
+                    ('social_links', 'Social Media Links'),
+                    ('contact_links', 'Contact Links')
+                ]
+                
+                for link_key, link_title in link_types:
+                    if links.get(link_key):
+                        st.write(f"**{link_title}:**")
+                        for link in links[link_key]:
+                            confidence_text = f" (Confidence: {link.get('confidence', 0):.2f})" if link.get('confidence') else ""
+                            st.write(f"- [{link.get('original_text', 'Link')}]({link.get('url', '#')}){confidence_text}")
             
             # Keywords
-            if data.get("keywords"):
-                st.subheader("Extracted Keywords")
-                keywords_df = pd.DataFrame(data["keywords"])
-                st.dataframe(keywords_df)
+            if analysis_result.get("keyword_analysis"):
+                keyword_analysis = analysis_result["keyword_analysis"]
+                st.subheader("Keyword Analysis")
+                
+                # Display top business keywords
+                if keyword_analysis.get("top_business_keywords"):
+                    st.write("**Top Business Keywords:**")
+                    for keyword_info in keyword_analysis["top_business_keywords"]:
+                        relevance = keyword_info.get('relevance_score', 0)
+                        frequency = keyword_info.get('frequency', 0)
+                        st.write(f"- **{keyword_info.get('keyword', 'N/A')}** (Relevance: {relevance:.2f}, Frequency: {frequency})")
+                
+                # Display all keywords in a table
+                if keyword_analysis.get("keywords"):
+                    st.write("**All Keywords:**")
+                    keywords_data = []
+                    for keyword_info in keyword_analysis["keywords"]:
+                        keywords_data.append({
+                            'Keyword': keyword_info.get('keyword', 'N/A'),
+                            'Category': keyword_info.get('category', 'N/A'),
+                            'Frequency': keyword_info.get('frequency', 0),
+                            'Relevance': f"{keyword_info.get('relevance_score', 0):.2f}"
+                        })
+                    
+                    if keywords_data:
+                        keywords_df = pd.DataFrame(keywords_data)
+                        st.dataframe(keywords_df, use_container_width=True)
         else:
             st.error(f"❌ Analysis failed: {result['error']}")
 
@@ -536,13 +626,16 @@ def render_analytics_dashboard():
             })
         
         if st.session_state.instagram_results and st.session_state.instagram_results["success"]:
-            data = st.session_state.instagram_results["data"]
-            business_confidence = data.get('business_analysis', {}).get('confidence_score', 0)
+            result = st.session_state.instagram_results
+            # Fix data structure access - API returns 'result' not 'data'
+            analysis_result = result.get("data", {}).get("result", {}) if "data" in result else result.get("result", {})
+            business_confidence = analysis_result.get('business_analysis', {}).get('confidence', 0)
+            processing_time = result.get('execution_time', 0)
             summary_data.append({
                 'Type': 'Instagram Analysis',
                 'Status': '✅ Success', 
                 'Results': f"Confidence: {business_confidence:.2f}",
-                'Processing Time': f"{data.get('processing_time_seconds', 0):.2f}s"
+                'Processing Time': f"{processing_time:.2f}s"
             })
         
         if st.session_state.company_results and st.session_state.company_results["success"]:

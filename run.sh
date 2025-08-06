@@ -35,8 +35,8 @@ if [[ ! -f "main.py" ]]; then
     exit 1
 fi
 
-if [[ ! -f "streamlit_app.py" ]]; then
-    echo "❌ streamlit_app.py not found. Make sure you're in the project root directory."
+if [[ ! -f "frontend/streamlit_app.py" ]]; then
+    echo "❌ frontend/streamlit_app.py not found. Make sure you're in the project root directory."
     exit 1
 fi
 
@@ -77,7 +77,7 @@ echo "🎨 Starting Streamlit frontend..."
 echo "   Frontend will be available at: http://localhost:8501"
 
 # Start Streamlit frontend in background
-uv run streamlit run streamlit_app.py --server.headless true --server.runOnSave true &
+uv run streamlit run frontend/streamlit_app.py --server.headless true --server.runOnSave true &
 FRONTEND_PID=$!
 
 echo ""

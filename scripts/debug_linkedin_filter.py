@@ -6,7 +6,7 @@ Debug script to trace LinkedIn filter query flow and identify where the filterin
 import asyncio
 import sys
 import os
-sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.models.serp import SearchRequest, SocialPlatform, LinkedInContentType
 from app.services.serp_service import SERPService
