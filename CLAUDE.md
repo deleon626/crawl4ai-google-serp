@@ -80,8 +80,9 @@ python example_search.py
 python example_usage.py
 
 # Start services individually
-streamlit run streamlit_app.py                    # Frontend only
-streamlit run streamlit_multipage_app.py          # Enhanced multipage frontend
+streamlit run streamlit_app.py                    # Original single-page frontend
+streamlit run streamlit_multipage_app.py          # Single-file multipage frontend (radio buttons)
+streamlit run 🏠_Home.py                          # Native multipage frontend (recommended)
 ```
 
 ## Code Architecture
