@@ -15,6 +15,9 @@
       "Bash(git commit:*)",
       "Bash(curl:*)",
       "Bash(uv run:*)",
+      "Bash(cd:*)",
+      "Bash(cd:*)",
+      "Bash(cd:*)",
       "Bash(cd:*)"
     ],
     "deny": []

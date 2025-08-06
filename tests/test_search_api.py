@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from datetime import datetime, UTC
 
 from main import create_app
-from app.models.serp import SearchRequest, SearchResponse, SearchResult
+from app.models.serp import SearchRequest, SearchResponse, SearchResult, BatchPaginationResponse, PageResult, BatchPaginationSummary
 from app.clients.bright_data import (
     BrightDataError,
     BrightDataRateLimitError, 
@@ -372,6 +372,141 @@ class TestSearchIntegration:
         assert search_request.page == 1
 
 
+class TestMultiPageSearch:
+    """Test multi-page search functionality through the unified endpoint."""
+    
+    @pytest.fixture
+    def mock_batch_response(self):
+        """Create mock batch pagination response."""
+        return BatchPaginationResponse(
+            query="test multi-page",
+            total_results=20,
+            pages_fetched=2,
+            pagination_summary=BatchPaginationSummary(
+                total_results_estimate=1000000,
+                results_per_page=10,
+                pages_requested=2,
+                pages_fetched=2,
+                start_page=1,
+                end_page=2,
+                batch_processing_time=2.5
+            ),
+            pages=[
+                PageResult(
+                    page_number=1,
+                    results_count=10,
+                    organic_results=[
+                        SearchResult(rank=i, title=f"Result {i}", url=f"https://example.com/{i}", description=f"Description {i}")
+                        for i in range(1, 11)
+                    ]
+                ),
+                PageResult(
+                    page_number=2,
+                    results_count=10,
+                    organic_results=[
+                        SearchResult(rank=i, title=f"Result {i}", url=f"https://example.com/{i}", description=f"Description {i}")
+                        for i in range(11, 21)
+                    ]
+                )
+            ],
+            merged_results=[
+                SearchResult(rank=i, title=f"Result {i}", url=f"https://example.com/{i}", description=f"Description {i}")
+                for i in range(1, 21)
+            ],
+            timestamp=datetime.now(UTC)
+        )
+    
+    @patch('app.services.batch_pagination_service.BatchPaginationService.fetch_batch_pages')
+    def test_multi_page_search_success(self, mock_batch_fetch, client, mock_batch_response):
+        """Test successful multi-page search request."""
+        # Setup mock
+        mock_batch_fetch.return_value = mock_batch_response
+        
+        # Make multi-page request
+        request_data = {
+            "query": "test multi-page",
+            "country": "US",
+            "language": "en",
+            "max_pages": 2,
+            "results_per_page": 10
+        }
+        
+        response = client.post("/api/v1/search", json=request_data)
+        
+        # Assertions
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["query"] == "test multi-page"
+        assert data["results_count"] == 20
+        assert data["pages_fetched"] == 2
+        assert data["pages"] is not None
+        assert len(data["pages"]) == 2
+        assert data["merged_results"] is not None
+        assert len(data["merged_results"]) == 20
+        assert data["pagination_summary"] is not None
+        
+        # Verify multi-page metadata
+        assert data["search_metadata"]["request_type"] == "multi_page"
+        assert data["search_metadata"]["max_pages"] == 2
+        assert data["search_metadata"]["processing_mode"] == "batch"
+        
+        # Verify mock was called correctly
+        mock_batch_fetch.assert_called_once()
+        call_args = mock_batch_fetch.call_args[0][0]
+        assert call_args.query == "test multi-page"
+        assert call_args.max_pages == 2
+    
+    def test_multi_page_request_validation(self, client):
+        """Test validation for multi-page requests."""
+        # Test valid multi-page requests
+        valid_requests = [
+            {"query": "test", "max_pages": 2},
+            {"query": "test", "max_pages": 3, "start_page": 2},
+            {"query": "test", "max_pages": 1},  # Edge case: max_pages=1 is still valid
+        ]
+        
+        for request_data in valid_requests:
+            response = client.post("/api/v1/search", json=request_data)
+            assert response.status_code != 422, f"Request failed validation: {request_data}"
+    
+    def test_multi_page_request_invalid_data(self, client):
+        """Test invalid multi-page request data."""
+        invalid_requests = [
+            {"query": "test", "max_pages": 0},  # Invalid: max_pages too low
+            {"query": "test", "max_pages": 11},  # Invalid: max_pages too high
+            {"query": "test", "start_page": 2},  # Invalid: start_page without max_pages
+            {"query": "test", "max_pages": -1},  # Invalid: negative max_pages
+        ]
+        
+        for request_data in invalid_requests:
+            response = client.post("/api/v1/search", json=request_data)
+            assert response.status_code == 422, f"Request should have failed validation: {request_data}"
+    
+    @patch('app.services.serp_service.SERPService.search')
+    def test_single_page_vs_multi_page_routing(self, mock_single_search, client, mock_search_response):
+        """Test that requests are properly routed to single vs multi-page services."""
+        # Setup mock for single-page
+        mock_single_search.return_value = mock_search_response
+        
+        # Test single-page request (no max_pages)
+        single_request = {
+            "query": "single page test",
+            "page": 2
+        }
+        
+        response = client.post("/api/v1/search", json=single_request)
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["search_metadata"]["request_type"] == "single_page"
+        assert data["pages_fetched"] is None  # Should not have multi-page fields
+        assert data["pages"] is None
+        
+        # Verify single-page service was called
+        mock_single_search.assert_called_once()
+
+
 class TestRequestResponseModels:
     """Test the request and response models work correctly with the API."""
     
@@ -383,6 +518,7 @@ class TestRequestResponseModels:
             {"query": "test", "country": "GB"},
             {"query": "test", "language": "fr"},
             {"query": "test", "page": 5},
+            {"query": "test", "max_pages": 2},  # Multi-page request
         ]
         
         for request_data in valid_requests:
@@ -399,6 +535,8 @@ class TestRequestResponseModels:
             {"query": "test", "page": 0},  # Invalid page number
             {"query": "test", "page": -1},  # Negative page number
             {"country": "US"},  # Missing query
+            {"query": "test", "max_pages": 0},  # Invalid max_pages
+            {"query": "test", "start_page": 2},  # start_page without max_pages
         ]
         
         for request_data in invalid_requests:

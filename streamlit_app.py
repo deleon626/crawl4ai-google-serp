@@ -42,8 +42,8 @@ def init_session_state():
         st.session_state.connection_status = None
     if 'last_search_results' not in st.session_state:
         st.session_state.last_search_results = None
-    if 'last_batch_results' not in st.session_state:
-        st.session_state.last_batch_results = None
+    if 'search_mode' not in st.session_state:
+        st.session_state.search_mode = "Single Page"
 
 # API Client Functions
 def test_api_connection(api_url: str) -> Dict[str, Any]:
@@ -69,22 +69,25 @@ def check_search_status(api_url: str) -> Dict[str, Any]:
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-def make_single_search(api_url: str, query: str, country: str, language: str, page: int, results_per_page: int, 
-                      social_platform: str = "none", instagram_filter: str = "all", linkedin_filter: str = "all") -> Dict[str, Any]:
-    """Make single search API call."""
+# Old make_single_search function removed - replaced by make_unified_search
+
+def make_batch_search(api_url: str, query: str, country: str, language: str, max_pages: int, results_per_page: int, start_page: int, 
+                     social_platform: str = "none", instagram_filter: str = "all", linkedin_filter: str = "all") -> Dict[str, Any]:
+    """Make batch search API call using the unified endpoint."""
     payload = {
         "query": query,
         "country": country,
         "language": language,
-        "page": page,
+        "max_pages": max_pages,  # This enables multi-page mode
         "results_per_page": results_per_page,
+        "start_page": start_page,
         "social_platform": social_platform,
         "instagram_content_type": instagram_filter,
         "linkedin_content_type": linkedin_filter
     }
     
     try:
-        response = requests.post(f"{api_url}/api/v1/search", json=payload, timeout=30)
+        response = requests.post(f"{api_url}/api/v1/search", json=payload, timeout=60)  # Updated to unified endpoint
         if response.status_code == 200:
             return {"status": "success", "data": response.json()}
         else:
@@ -94,23 +97,30 @@ def make_single_search(api_url: str, query: str, country: str, language: str, pa
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-def make_batch_search(api_url: str, query: str, country: str, language: str, max_pages: int, results_per_page: int, start_page: int, 
-                     social_platform: str = "none", instagram_filter: str = "all", linkedin_filter: str = "all") -> Dict[str, Any]:
-    """Make batch search API call."""
+def make_unified_search(api_url: str, query: str, country: str, language: str, max_pages: int, results_per_page: int, start_page: int,
+                       social_platform: str = "none", instagram_filter: str = "all", linkedin_filter: str = "all") -> Dict[str, Any]:
+    """Make unified search API call that handles both single and multi-page requests."""
     payload = {
         "query": query,
         "country": country,
         "language": language,
-        "max_pages": max_pages,
         "results_per_page": results_per_page,
-        "start_page": start_page,
         "social_platform": social_platform,
         "instagram_content_type": instagram_filter,
         "linkedin_content_type": linkedin_filter
     }
     
+    # Add single-page or multi-page parameters
+    if max_pages == 1:
+        # Single-page mode
+        payload["page"] = start_page
+    else:
+        # Multi-page mode
+        payload["max_pages"] = max_pages
+        payload["start_page"] = start_page
+    
     try:
-        response = requests.post(f"{api_url}/api/v1/search/pages", json=payload, timeout=60)
+        response = requests.post(f"{api_url}/api/v1/search", json=payload, timeout=60)
         if response.status_code == 200:
             return {"status": "success", "data": response.json()}
         else:
@@ -391,104 +401,25 @@ def render_linkedin_content_filter(section_key):
         if articles_selected:
             st.session_state[f'linkedin_filter_{section_key}'] = 'articles'
 
-def render_single_search_form():
-    """Render single search form."""
-    st.subheader("🔍 Single Search")
-    
-    # Social platform filter section
-    platform, instagram_filter, linkedin_filter = render_social_platform_section("single")
-    
-    # Query input
-    query = st.text_input("Search Query", value="", placeholder="Enter your search query...")
-    
-    # Query Preview Section
-    if query:
-        st.subheader("🔍 Query Modifier Preview")
-        modified_query, description = generate_query_preview(query, platform, instagram_filter, linkedin_filter)
-        
-        # Display original vs modified query
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Original Query:**")
-            st.code(query, language="text")
-        with col2:
-            st.write("**Modified Query:**")
-            st.code(modified_query, language="text")
-        
-        # Description
-        st.info(f"📝 {description}")
-        
-        # Google Search URL
-        if modified_query:
-            google_url = f"https://www.google.com/search?q={modified_query.replace(' ', '+')}"
-            st.write("**🔗 Direct Google Search URL:**")
-            st.text(google_url)
-        
-        st.divider()
-    
-    # Location and language settings
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        country_option = st.selectbox(
-            "Country", 
-            ["Custom"] + list(COMMON_COUNTRIES.keys()),
-            format_func=lambda x: f"{x} - {COMMON_COUNTRIES[x]}" if x in COMMON_COUNTRIES else x
-        )
-        
-        if country_option == "Custom":
-            country = st.text_input("Country Code", value="ID", max_chars=2, help="2-letter uppercase ISO code")
-        else:
-            country = country_option
-        
-        # Validate country code
-        if not validate_country_code(country):
-            st.error("❌ Country code must be 2-letter uppercase (e.g., 'US')")
-    
-    with col2:
-        language_option = st.selectbox(
-            "Language",
-            ["Custom"] + list(COMMON_LANGUAGES.keys()),
-            format_func=lambda x: f"{x} - {COMMON_LANGUAGES[x]}" if x in COMMON_LANGUAGES else x
-        )
-        
-        if language_option == "Custom":
-            language = st.text_input("Language Code", value="en", max_chars=2, help="2-letter lowercase ISO code")
-        else:
-            language = language_option
-        
-        # Validate language code
-        if not validate_language_code(language):
-            st.error("❌ Language code must be 2-letter lowercase (e.g., 'en')")
-    
-    # Pagination settings
-    col3, col4 = st.columns(2)
-    with col3:
-        page = st.number_input("Page", min_value=1, max_value=100, value=1)
-    with col4:
-        results_per_page_options = [10, 20, 50, 100]
-        results_per_page = st.selectbox("Results per Page", results_per_page_options, index=3)  # Default to 100
-    
-    # Search button
-    if st.button("🚀 Search", type="primary", disabled=not query or not validate_country_code(country) or not validate_language_code(language)):
-        with st.spinner("Searching..."):
-            result = make_single_search(st.session_state.api_url, query, country, language, page, results_per_page, 
-                                      platform, instagram_filter, linkedin_filter)
-            st.session_state.last_search_results = result
-    
-    # Display results
-    if st.session_state.last_search_results:
-        render_search_results(st.session_state.last_search_results, "single")
+# Single search form removed - functionality merged into unified smart search
 
-def render_batch_search_form():
-    """Render batch search form."""
-    st.subheader("📄 Batch Search")
+def render_smart_search_form():
+    """Render unified smart search form with single and multi-page modes."""
+    st.subheader("🔍 Smart Search")
+    
+    # Search mode toggle
+    search_mode = st.radio(
+        "Search Mode:",
+        ["Single Page", "Multi-Page"],
+        horizontal=True,
+        help="Single Page: Get results from one page quickly. Multi-Page: Fetch results from multiple pages for comprehensive coverage."
+    )
     
     # Social platform filter section
-    platform, instagram_filter, linkedin_filter = render_social_platform_section("batch")
+    platform, instagram_filter, linkedin_filter = render_social_platform_section("smart")
     
     # Query input
-    query = st.text_input("Search Query", value="", placeholder="Enter your search query...", key="batch_query")
+    query = st.text_input("Search Query", value="", placeholder="Enter your search query...", key="smart_query")
     
     # Query Preview Section
     if query:
@@ -523,11 +454,11 @@ def render_batch_search_form():
             "Country", 
             ["Custom"] + list(COMMON_COUNTRIES.keys()),
             format_func=lambda x: f"{x} - {COMMON_COUNTRIES[x]}" if x in COMMON_COUNTRIES else x,
-            key="batch_country"
+            key="smart_country"
         )
         
         if country_option == "Custom":
-            country = st.text_input("Country Code", value="ID", max_chars=2, help="2-letter uppercase ISO code", key="batch_country_custom")
+            country = st.text_input("Country Code", value="ID", max_chars=2, help="2-letter uppercase ISO code", key="smart_country_custom")
         else:
             country = country_option
         
@@ -540,11 +471,11 @@ def render_batch_search_form():
             "Language",
             ["Custom"] + list(COMMON_LANGUAGES.keys()),
             format_func=lambda x: f"{x} - {COMMON_LANGUAGES[x]}" if x in COMMON_LANGUAGES else x,
-            key="batch_language"
+            key="smart_language"
         )
         
         if language_option == "Custom":
-            language = st.text_input("Language Code", value="en", max_chars=2, help="2-letter lowercase ISO code", key="batch_language_custom")
+            language = st.text_input("Language Code", value="en", max_chars=2, help="2-letter lowercase ISO code", key="smart_language_custom")
         else:
             language = language_option
         
@@ -552,29 +483,60 @@ def render_batch_search_form():
         if not validate_language_code(language):
             st.error("❌ Language code must be 2-letter lowercase (e.g., 'en')")
     
-    # Batch settings
-    col3, col4, col5 = st.columns(3)
-    with col3:
-        max_pages = st.number_input("Max Pages", min_value=1, max_value=3, value=3)
-    with col4:
-        start_page = st.number_input("Start Page", min_value=1, max_value=100, value=1)
-    with col5:
-        results_per_page_options = [10, 20, 50, 100]
-        results_per_page = st.selectbox("Results per Page", results_per_page_options, index=3, key="batch_results_per_page")  # Default to 100
+    # Search settings based on mode
+    if search_mode == "Single Page":
+        # Single-page settings
+        col3, col4 = st.columns(2)
+        with col3:
+            page = st.number_input("Page Number", min_value=1, max_value=100, value=1)
+        with col4:
+            results_per_page_options = [10, 20, 50, 100]
+            results_per_page = st.selectbox("Results per Page", results_per_page_options, index=1, key="smart_results_per_page")  # Default to 20
+        
+        # Set single-page values
+        max_pages = 1
+        start_page = page
+    else:
+        # Multi-page settings
+        col3, col4, col5 = st.columns(3)
+        with col3:
+            max_pages = st.number_input("Pages to Fetch", min_value=2, max_value=5, value=2, 
+                                       help="Number of pages to fetch (2-5)")
+        with col4:
+            start_page = st.number_input("Start Page", min_value=1, max_value=100, value=1,
+                                        help="Which page to start from")
+        with col5:
+            results_per_page_options = [10, 20, 50, 100]
+            results_per_page = st.selectbox("Results per Page", results_per_page_options, index=3, key="smart_results_per_page_multi")  # Default to 100
+        
+        page = start_page
     
     # Search button
-    if st.button("🚀 Batch Search", type="primary", disabled=not query or not validate_country_code(country) or not validate_language_code(language)):
-        with st.spinner(f"Searching {max_pages} pages..."):
-            result = make_batch_search(st.session_state.api_url, query, country, language, max_pages, results_per_page, start_page, 
+    search_button_text = "🚀 Search" if search_mode == "Single Page" else f"🚀 Search {max_pages} Pages"
+    
+    if st.button(search_button_text, type="primary", disabled=not query or not validate_country_code(country) or not validate_language_code(language)):
+        search_description = f"page {page}" if search_mode == "Single Page" else f"{max_pages} pages"
+        with st.spinner(f"Searching {search_description}..."):
+            result = make_unified_search(st.session_state.api_url, query, country, language, max_pages, results_per_page, start_page, 
                                       platform, instagram_filter, linkedin_filter)
-            st.session_state.last_batch_results = result
+            st.session_state.last_search_results = result
+            st.session_state.search_mode = search_mode  # Store search mode for result rendering
     
     # Display results
-    if st.session_state.last_batch_results:
-        render_batch_results(st.session_state.last_batch_results)
+    if st.session_state.last_search_results:
+        render_unified_results(st.session_state.last_search_results, st.session_state.get('search_mode', 'Single Page'))
 
-def render_search_results(result: Dict[str, Any], search_type: str):
-    """Render single search results."""
+# Old render_search_results function removed - replaced by unified results rendering
+
+def render_unified_results(result: Dict[str, Any], search_mode: str):
+    """Render unified search results for both single and multi-page modes."""
+    if search_mode == "Single Page":
+        render_single_page_results(result)
+    else:
+        render_multi_page_results(result)
+
+def render_single_page_results(result: Dict[str, Any]):
+    """Render single-page search results with clean interface."""
     st.subheader("📊 Search Results")
     
     if result["status"] == "error":
@@ -586,16 +548,94 @@ def render_search_results(result: Dict[str, Any], search_type: str):
     
     data = result["data"]
     
-    # Summary
+    # Summary metrics
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Query", data["query"])
     with col2:
-        st.metric("Results Found", data["results_count"])
+        st.metric("Results", data["results_count"])
     with col3:
-        st.metric("Timestamp", data["timestamp"][:19])
+        # Show current page info
+        pagination = data.get("pagination")
+        page_info = f"Page {pagination.get('current_page', 1)}" if pagination else "Page 1"
+        st.metric("Current Page", page_info)
     with col4:
-        # Show active platform and filter if available in metadata
+        # Show platform filter from search metadata
+        platform_info = "🌍 All Platforms"
+        if data.get("search_metadata"):
+            metadata = data["search_metadata"]
+            platform = metadata.get("social_platform", "none")
+            
+            if platform == "instagram":
+                ig_filter = metadata.get("instagram_content_type", "all").title()
+                platform_info = f"📱 IG: {ig_filter}"
+            elif platform == "linkedin":
+                li_filter = metadata.get("linkedin_content_type", "all").title()
+                platform_info = f"💼 LI: {li_filter}"
+        
+        st.metric("Platform", platform_info)
+    
+    # Results
+    if data["organic_results"]:
+        results_data = []
+        for result in data["organic_results"]:
+            results_data.append({
+                "Rank": result["rank"],
+                "Title": result["title"][:80] + "..." if len(result["title"]) > 80 else result["title"],
+                "URL": result["url"],
+                "Description": result.get("description", "")[:150] + "..." if result.get("description") and len(result.get("description", "")) > 150 else result.get("description", "")
+            })
+        
+        st.dataframe(results_data, use_container_width=True)
+        
+        # Pagination info
+        if pagination:
+            if pagination.get("has_next_page") or pagination.get("has_previous_page"):
+                next_prev_info = []
+                if pagination.get("has_previous_page"):
+                    next_prev_info.append("← Previous available")
+                if pagination.get("has_next_page"):
+                    next_prev_info.append("Next available →")
+                
+                if next_prev_info:
+                    st.info(" | ".join(next_prev_info))
+    else:
+        st.warning("No results found.")
+    
+    # Raw JSON
+    with st.expander("📄 Raw JSON Response"):
+        st.json(data)
+
+def render_multi_page_results(result: Dict[str, Any]):
+    """Render multi-page search results with advanced features."""
+    return render_batch_results(result)
+
+def render_batch_results(result: Dict[str, Any]):
+    """Render multi-page search results from the unified endpoint."""
+    st.subheader("📊 Multi-Page Search Results")
+    
+    if result["status"] == "error":
+        st.error(f"❌ Multi-page search failed: {result['message']}")
+        if "data" in result and result["data"]:
+            with st.expander("Error Details"):
+                st.json(result["data"])
+        return
+    
+    data = result["data"]
+    
+    # Summary
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.metric("Query", data["query"])
+    with col2:
+        st.metric("Total Results", data["results_count"])  # Updated field name
+    with col3:
+        st.metric("Pages Fetched", data.get("pages_fetched", 0))
+    with col4:
+        processing_time = data.get("pagination_summary", {}).get("batch_processing_time", 0)
+        st.metric("Processing Time", f"{processing_time:.2f}s")
+    with col5:
+        # Show platform filter from search metadata
         platform_info = "N/A"
         if data.get("search_metadata"):
             metadata = data["search_metadata"]
@@ -612,77 +652,12 @@ def render_search_results(result: Dict[str, Any], search_type: str):
         
         st.metric("Platform Filter", platform_info)
     
-    # Pagination info
-    if "pagination" in data and data["pagination"]:
-        pagination = data["pagination"]
-        st.info(f"📄 Page {pagination['current_page']} | Results {pagination['page_range_start']}-{pagination['page_range_end']} | Estimated total: {pagination.get('total_results_estimate', 'N/A')}")
-    
-    # Results table
-    if data["organic_results"]:
-        st.subheader("🔗 Organic Results")
-        results_data = []
-        for result in data["organic_results"]:
-            results_data.append({
-                "Rank": result["rank"],
-                "Title": result["title"][:100] + "..." if len(result["title"]) > 100 else result["title"],
-                "URL": result["url"],
-                "Description": result.get("description", "")[:200] + "..." if result.get("description") and len(result.get("description", "")) > 200 else result.get("description", "")
-            })
-        
-        st.dataframe(results_data, use_container_width=True)
-    else:
-        st.warning("No organic results found.")
-    
-    # Raw JSON
-    with st.expander("📄 Raw JSON Response"):
-        st.json(data)
-
-def render_batch_results(result: Dict[str, Any]):
-    """Render batch search results."""
-    st.subheader("📊 Batch Search Results")
-    
-    if result["status"] == "error":
-        st.error(f"❌ Batch search failed: {result['message']}")
-        if "data" in result and result["data"]:
-            with st.expander("Error Details"):
-                st.json(result["data"])
-        return
-    
-    data = result["data"]
-    
-    # Summary
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        st.metric("Query", data["query"])
-    with col2:
-        st.metric("Total Results", data["total_results"])
-    with col3:
-        st.metric("Pages Fetched", data["pages_fetched"])
-    with col4:
-        st.metric("Processing Time", f"{data['pagination_summary'].get('batch_processing_time', 0):.2f}s")
-    with col5:
-        # Show platform filter from first page's metadata if available
-        platform_info = "N/A"
-        if data.get("pages") and len(data["pages"]) > 0:
-            first_page = data["pages"][0]
-            if first_page.get("search_metadata"):
-                metadata = first_page["search_metadata"]
-                platform = metadata.get("social_platform", "none")
-                
-                if platform == "instagram":
-                    ig_filter = metadata.get("instagram_content_type", "all").title()
-                    platform_info = f"📱 IG: {ig_filter}"
-                elif platform == "linkedin":
-                    li_filter = metadata.get("linkedin_content_type", "all").title()
-                    platform_info = f"💼 LI: {li_filter}"
-                else:
-                    platform_info = "🌍 All Platforms"
-        
-        st.metric("Platform Filter", platform_info)
-    
     # Pages summary
-    summary = data["pagination_summary"]
-    st.info(f"📄 Pages {summary['start_page']}-{summary['end_page']} | {summary['results_per_page']} results per page | Total estimate: {summary.get('total_results_estimate', 'N/A')}")
+    summary = data.get("pagination_summary", {})
+    if summary:
+        st.info(f"📄 Pages {summary.get('start_page', 1)}-{summary.get('end_page', 1)} | {summary.get('results_per_page', 10)} results per page | Total estimate: {summary.get('total_results_estimate', 'N/A')}")
+    else:
+        st.info("📄 Multi-page search completed")
     
     # View mode toggle
     view_mode = st.radio(
@@ -788,16 +763,12 @@ def main():
     render_header()
     render_api_settings()
     
-    # Main content
-    tab1, tab2, tab3 = st.tabs(["🔍 Single Search", "📄 Batch Search", "🏥 Health Checks"])
+    # Main content - Unified search interface
+    render_smart_search_form()
     
-    with tab1:
-        render_single_search_form()
-    
-    with tab2:
-        render_batch_search_form()
-    
-    with tab3:
+    # Health checks section
+    st.divider()
+    with st.expander("🏥 Health Checks", expanded=False):
         render_health_checks()
     
     # Footer

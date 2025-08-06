@@ -1,0 +1,5 @@
+# Product Mission (Lite)
+
+**Intelligent SERP API** is a self-hosted Google search proxy that helps developers and researchers discover business intelligence patterns by providing advanced query modifiers, automated workflow strategies, and comprehensive company analysis including employee discovery through website crawling.
+
+**Intelligent SERP API** serves developers building market research tools, business analysts researching competitors, and recruitment researchers analyzing company structures. Unlike basic Google search APIs, we provide intelligent workflow strategies that analyze content patterns (Instagram bio analysis, business indicator extraction), automatically execute parallel searches to discover similar companies, and provide comprehensive company analysis with automated website discovery and employee identification through multi-page Streamlit workflows and dedicated API endpoints.

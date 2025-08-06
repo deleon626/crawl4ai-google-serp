@@ -1,5 +1,6 @@
 """SERP data models."""
 
+from __future__ import annotations
 from pydantic import BaseModel, HttpUrl, Field, field_validator, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime, UTC
@@ -37,13 +38,29 @@ class LinkedInContentType(str, Enum):
 
 
 class SearchRequest(BaseModel):
-    """Search request model for Bright Data SERP API."""
+    """Unified search request model for both single and multi-page searches."""
     
     query: str = Field(..., description="Search query string", min_length=1)
     country: str = Field(default="ID", description="Country code for search (ISO 3166-1 alpha-2)")
     language: str = Field(default="en", description="Language code for search (ISO 639-1)")
-    page: int = Field(default=1, description="Page number for pagination", ge=1, le=100)
+    
+    # Single-page parameters (backward compatible)
+    page: int = Field(default=1, description="Page number for single-page search", ge=1, le=100)
     results_per_page: int = Field(default=10, description="Results per page", ge=1, le=100)
+    
+    # Multi-page parameters (optional for batch functionality)
+    max_pages: Optional[int] = Field(
+        default=None, 
+        description="Maximum pages to fetch for batch search. If specified, enables multi-page mode.", 
+        ge=1, le=10
+    )
+    start_page: Optional[int] = Field(
+        default=None, 
+        description="Starting page number for batch search (defaults to 'page' value)", 
+        ge=1
+    )
+    
+    # Social platform filtering
     social_platform: SocialPlatform = Field(
         default=SocialPlatform.NONE, 
         description="Social media platform filter (none, instagram, linkedin)"
@@ -72,6 +89,22 @@ class SearchRequest(BaseModel):
         if len(v) != 2 or not v.islower():
             raise ValueError('Language code must be 2-letter lowercase ISO code')
         return v
+    
+    @field_validator('start_page')
+    @classmethod
+    def validate_start_page(cls, v: Optional[int], info) -> Optional[int]:
+        """Validate start_page is compatible with max_pages."""
+        if v is not None and info.data.get('max_pages') is None:
+            raise ValueError('start_page can only be used with max_pages')
+        return v
+    
+    def is_multi_page_request(self) -> bool:
+        """Check if this is a multi-page request."""
+        return self.max_pages is not None and self.max_pages > 1
+    
+    def get_effective_start_page(self) -> int:
+        """Get the effective start page for batch processing."""
+        return self.start_page if self.start_page is not None else self.page
 
 
 class SearchResult(BaseModel):
@@ -123,14 +156,29 @@ class PaginationMetadata(BaseModel):
 
 
 class SearchResponse(BaseModel):
-    """Complete search response model."""
+    """Unified search response model for both single and multi-page results."""
     
     query: str = Field(..., description="Original search query")
     results_count: int = Field(..., description="Number of results returned", ge=0)
     organic_results: List[SearchResult] = Field(default=[], description="Organic search results")
-    pagination: Optional[PaginationMetadata] = Field(None, description="Pagination metadata")
+    
+    # Single-page response fields
+    pagination: Optional[PaginationMetadata] = Field(None, description="Pagination metadata for single-page responses")
+    
+    # Multi-page response fields (only populated for multi-page requests)
+    pages_fetched: Optional[int] = Field(None, description="Number of pages successfully fetched (multi-page only)")
+    pages: Optional[List[PageResult]] = Field(None, description="Results for each fetched page (multi-page only)")
+    merged_results: Optional[List[SearchResult]] = Field(None, description="All results merged with continuous ranking (multi-page only)")
+    merged_metadata: Optional[MergedResultsMetadata] = Field(None, description="Metadata about merge operation (multi-page only)")
+    pagination_summary: Optional[BatchPaginationSummary] = Field(None, description="Batch pagination summary (multi-page only)")
+    
+    # Common fields
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Response timestamp")
     search_metadata: Optional[Dict[str, Any]] = Field(None, description="Additional search metadata")
+    
+    def is_multi_page_response(self) -> bool:
+        """Check if this is a multi-page response."""
+        return self.pages_fetched is not None and self.pages_fetched > 1
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -165,43 +213,9 @@ class SearchResponse(BaseModel):
     )
 
 
-class BatchPaginationRequest(BaseModel):
-    """Request model for batch pagination searches."""
-    
-    query: str = Field(..., description="Search query string", min_length=1)
-    country: str = Field(default="ID", description="Country code for search (ISO 3166-1 alpha-2)")
-    language: str = Field(default="en", description="Language code for search (ISO 639-1)")
-    max_pages: int = Field(default=3, description="Maximum pages to fetch", ge=1, le=10)
-    results_per_page: int = Field(default=10, description="Results per page", ge=1, le=100)
-    start_page: int = Field(default=1, description="Starting page number", ge=1)
-    social_platform: SocialPlatform = Field(
-        default=SocialPlatform.NONE, 
-        description="Social media platform filter (none, instagram, linkedin)"
-    )
-    instagram_content_type: InstagramContentType = Field(
-        default=InstagramContentType.ALL, 
-        description="Instagram content type filter (all, reels, posts, accounts, tv, locations)"
-    )
-    linkedin_content_type: LinkedInContentType = Field(
-        default=LinkedInContentType.ALL, 
-        description="LinkedIn content type filter (all, profiles, companies, posts, jobs, articles)"
-    )
-    
-    @field_validator('country')
-    @classmethod
-    def validate_country(cls, v: str) -> str:
-        """Validate country code format."""
-        if len(v) != 2 or not v.isupper():
-            raise ValueError('Country code must be 2-letter uppercase ISO code')
-        return v
-    
-    @field_validator('language')
-    @classmethod
-    def validate_language(cls, v: str) -> str:
-        """Validate language code format."""
-        if len(v) != 2 or not v.islower():
-            raise ValueError('Language code must be 2-letter lowercase ISO code')
-        return v
+# BatchPaginationRequest has been merged into SearchRequest above
+# Legacy alias for backward compatibility
+BatchPaginationRequest = SearchRequest
 
 
 class PageResult(BaseModel):

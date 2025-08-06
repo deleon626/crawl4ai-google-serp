@@ -34,7 +34,7 @@ class IndonesiaFashionTester:
         """Initialize the tester."""
         self.base_url = base_url.rstrip('/')
         self.search_endpoint = f"{self.base_url}/api/v1/search"
-        self.batch_endpoint = f"{self.base_url}/api/v1/search/pages"
+        self.batch_endpoint = f"{self.base_url}/api/v1/search"  # Updated to unified endpoint
         
         # HTTP client
         self.client = httpx.AsyncClient(
