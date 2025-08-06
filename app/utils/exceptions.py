@@ -13,6 +13,22 @@ from app.clients.bright_data import (
     BrightDataTimeoutError
 )
 
+
+# Application-specific exceptions
+class AppError(Exception):
+    """Base application error"""
+    pass
+
+
+class CompanyAnalysisError(AppError):
+    """Company analysis operation failed"""
+    pass
+
+
+class CrawlError(AppError):
+    """Crawling operation failed"""
+    pass
+
 logger = logging.getLogger(__name__)
 
 

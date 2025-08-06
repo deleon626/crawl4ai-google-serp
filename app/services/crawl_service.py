@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 
 from app.clients.crawl4ai_client import Crawl4aiClient
 from app.models.crawl import CrawlRequest, CrawlResponse, CrawlResult
-from app.utils.decorators import log_operation
+from app.utils.logging_decorators import log_operation
 
 logger = logging.getLogger(__name__)
 

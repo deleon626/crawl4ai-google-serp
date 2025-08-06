@@ -17,7 +17,7 @@ from app.services.crawl_service import CrawlService
 from app.services.instagram_service import InstagramSearchService
 from app.services.link_validation_service import LinkValidationService
 from app.services.keyword_extraction_service import KeywordExtractionService
-from app.utils.decorators import log_operation
+from app.utils.logging_decorators import log_operation
 
 logger = logging.getLogger(__name__)
 
