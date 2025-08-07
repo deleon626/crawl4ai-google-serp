@@ -25,22 +25,18 @@ st.markdown("Overview of recent analyses and insights.")
 render_sidebar_config()
 
 # Summary Cards
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    search_count = 1 if st.session_state.get('search_results') else 0
-    st.metric("SERP Searches", search_count)
-
-with col2:
     instagram_count = 1 if st.session_state.get('instagram_results') else 0
     st.metric("Instagram Analyses", instagram_count)
 
-with col3:
+with col2:
     company_count = 1 if st.session_state.get('company_results') else 0
     st.metric("Company Analyses", company_count)
 
-with col4:
-    total_analyses = search_count + instagram_count + company_count
+with col3:
+    total_analyses = instagram_count + company_count
     st.metric("Total Analyses", total_analyses)
 
 # Recent Results Summary
@@ -49,15 +45,6 @@ if total_analyses > 0:
     
     # Create summary data
     summary_data = []
-    
-    if st.session_state.get('search_results') and st.session_state.search_results["success"]:
-        data = st.session_state.search_results["data"]
-        summary_data.append({
-            'Type': 'SERP Search',
-            'Status': '✅ Success',
-            'Results': len(data.get('results', [])),
-            'Processing Time': f"{data.get('processing_time_seconds', 0):.2f}s"
-        })
     
     if st.session_state.get('instagram_results') and st.session_state.instagram_results["success"]:
         data = st.session_state.instagram_results["data"]
@@ -128,7 +115,6 @@ with st.expander("📖 How to Use This Dashboard"):
     **Multi-Page Navigation:**
     1. Use the **sidebar menu** to navigate between pages
     2. Each page has its own functionality:
-       - **🔍 SERP Search**: Google search with advanced options
        - **📱 Instagram Analysis**: Business profile analysis
        - **🏢 Company Analysis**: Company research & employee discovery
        - **📊 Analytics Dashboard**: Overview and insights

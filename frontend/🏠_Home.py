@@ -20,8 +20,8 @@ from utils.streamlit_shared import make_api_request, init_session_state, render_
 init_session_state()
 
 # Header
-st.title("🔍 SERP Parser & Business Intelligence")
-st.markdown("**Comprehensive business research platform with Google SERP, Instagram analysis, and company intelligence.**")
+st.title("🔍 SERP Parser & Web Crawler")
+st.markdown("**Comprehensive web research platform with Google SERP search and intelligent content analysis.**")
 
 # Render sidebar configuration
 render_sidebar_config()
@@ -32,20 +32,21 @@ st.subheader("📊 Platform Overview")
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    search_count = 1 if st.session_state.get('search_results') else 0
-    st.metric("SERP Searches", search_count, help="Google search analyses completed")
+    search_count = len(st.session_state.get('search_history', []))
+    st.metric("SERP Searches", search_count, help="Google SERP searches performed")
 
 with col2:
-    instagram_count = 1 if st.session_state.get('instagram_results') else 0  
-    st.metric("Instagram Analyses", instagram_count, help="Instagram business profiles analyzed")
+    crawl_count = 1 if st.session_state.get('crawl_results') else 0
+    st.metric("Pages Crawled", crawl_count, help="Web pages crawled and analyzed")
 
 with col3:
-    company_count = 1 if st.session_state.get('company_results') else 0
-    st.metric("Company Research", company_count, help="Company analyses with employee discovery")
+    total_operations = search_count + crawl_count
+    st.metric("Total Operations", total_operations, help="All searches and crawls performed")
 
 with col4:
-    total_analyses = search_count + instagram_count + company_count
-    st.metric("Total Analyses", total_analyses, help="All analyses across platforms")
+    connection_status = st.session_state.get('connection_status', {})
+    is_active = connection_status.get('success', False) if connection_status else False
+    st.metric("API Status", "🟢 Active" if is_active else "🔴 Unknown", help="Backend API connection status")
 
 # Platform Capabilities
 st.subheader("🚀 Platform Capabilities")
@@ -54,32 +55,28 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("""
-    ### 🔍 **SERP Search Engine**
-    - Advanced Google search with country/language targeting
-    - Batch pagination for comprehensive results
-    - Real-time search result processing
-    - Bright Data API integration for reliable access
-    
-    ### 📱 **Instagram Business Intelligence**
-    - Automated business profile detection
-    - Contact information extraction
-    - Link analysis and validation
-    - Keyword extraction with confidence scoring
+    ### 🔍 **Google SERP Search**
+    - Multi-page batch search capabilities
+    - Real-time search result parsing
+    - Advanced pagination support
+    - Rich metadata extraction
+    - Organic result filtering
+    - Continuation token management
     """)
 
 with col2:
     st.markdown("""
-    ### 🏢 **Company Analysis & Discovery**
-    - Intelligent company website discovery
-    - Employee extraction with role categorization
-    - Technology stack identification
-    - Social media profile mapping
+    ### 🕷️ **Web Content Crawling**
+    - Intelligent content extraction
+    - JavaScript rendering support
+    - Structured data parsing
+    - Content cleaning and formatting
     
     ### 📊 **Analytics & Insights**
-    - Cross-platform analysis dashboard
-    - Performance metrics and processing times
-    - Confidence scoring for all extracted data
-    - Export capabilities for further analysis
+    - Search performance dashboard
+    - Crawling success metrics
+    - Processing time optimization
+    - Export capabilities for analysis
     """)
 
 # Getting Started Guide
@@ -95,45 +92,31 @@ with st.expander("🔧 **Step 1: Setup & Configuration**"):
 
 with st.expander("🔍 **Step 2: SERP Search**"):
     st.markdown("""
-    1. Navigate to **🔍 SERP Search** in the sidebar
-    2. Enter your search query and configure options:
-       - **Country**: Target specific geographic regions
-       - **Language**: Set language preferences
-       - **Results**: Control number of results per page
-    3. Choose between single page or batch pagination
-    4. Review results and metrics
+    1. Go to **🔍 SERP Search** page
+    2. **Single Search**: Enter search query for immediate results
+    3. **Batch Search**: Configure multi-page searches with pagination
+    4. Review organic results with titles, URLs, and snippets
+    5. Export search results for further analysis
     """)
 
-with st.expander("📱 **Step 3: Instagram Analysis**"):
+with st.expander("🕷️ **Step 3: Web Crawling**"):
     st.markdown("""
-    1. Go to **📱 Instagram Analysis** page
-    2. **Profile Analysis**: Enter Instagram profile URL for business intelligence
-    3. **Search Queries**: Generate targeted Instagram business search queries
-    4. Review confidence scores and extracted business indicators
-    5. Export contact information and business insights
+    1. Access **🕷️ Crawling** page
+    2. Provide target URL for content extraction
+    3. Configure crawling options:
+       - **JavaScript Rendering**: For dynamic content
+       - **Content Filtering**: Focus on specific content types
+       - **Timeout Settings**: Balance speed vs. completeness
+    4. Review extracted content and metadata
     """)
 
-with st.expander("🏢 **Step 4: Company Research**"):
-    st.markdown("""
-    1. Access **🏢 Company Analysis** page
-    2. Provide company information:
-       - **Company Name**: For automatic website discovery
-       - **Website URL**: For direct analysis
-       - **LinkedIn URL**: For enhanced company context
-    3. Configure analysis options:
-       - **Deep Analysis**: Comprehensive website crawling
-       - **Employee Extraction**: Discover key personnel
-       - **Max Employees**: Limit results for faster processing
-    4. Review comprehensive company intelligence report
-    """)
-
-with st.expander("📊 **Step 5: Analytics Dashboard**"):
+with st.expander("📊 **Step 4: Analytics Dashboard**"):
     st.markdown("""
     1. Visit **📊 Analytics Dashboard** for overview
-    2. Monitor analysis performance and success rates
+    2. Monitor search and crawl performance
     3. Review API health status and available endpoints
-    4. Track processing times and result quality metrics
-    5. Access historical analysis summaries
+    4. Track processing times and success rates
+    5. Access operation history and metrics
     """)
 
 # API Health Check
@@ -176,7 +159,7 @@ st.info("👈 **Use the sidebar menu** to navigate between different analysis mo
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray; padding: 20px;'>
-<p><strong>SERP Parser & Business Intelligence Platform</strong></p>
-<p>Powered by FastAPI + Streamlit | Crawl4ai + Bright Data | Phase 2.5 Complete</p>
+<p><strong>SERP Parser & Web Crawler Platform</strong></p>
+<p>Powered by FastAPI + Streamlit | Crawl4ai + Bright Data | Phase 1 Core</p>
 </div>
 """, unsafe_allow_html=True)

@@ -21,8 +21,8 @@ if not exist "main.py" (
     exit /b 1
 )
 
-if not exist "frontend\streamlit_app.py" (
-    echo ❌ frontend\streamlit_app.py not found. Make sure you're in the project root directory.
+if not exist "frontend\🏠_Home.py" (
+    echo ❌ frontend\🏠_Home.py not found. Make sure you're in the project root directory.
     pause
     exit /b 1
 )
@@ -48,8 +48,10 @@ echo    Frontend will be available at: http://localhost:8501
 echo.
 echo ✅ Both services are starting up...
 echo ==================================
-echo 📱 Instagram Content Filtering Available:
-echo    🌍 All Content  🎬 Reels Only  📷 Posts Only  👤 Accounts Only
+echo 🔍 SERP Parser ^& Business Intelligence Platform:
+echo    📱 Instagram Business Analysis: Profile detection, contact extraction, keyword analysis
+echo    🏢 Company Research: Website discovery, employee extraction, technology identification
+echo    📊 Analytics Dashboard: Performance metrics, API health monitoring, cross-platform insights
 echo.
 echo 🌐 URLs:
 echo    • Streamlit Frontend: http://localhost:8501
@@ -60,4 +62,4 @@ echo 💡 Press Ctrl+C to stop all services
 echo ==================================
 
 REM Start Streamlit frontend (this will block)
-uv run streamlit run frontend\streamlit_app.py --server.headless true --server.runOnSave true
+uv run streamlit run frontend\🏠_Home.py --server.headless true --server.runOnSave true

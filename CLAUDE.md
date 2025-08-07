@@ -32,21 +32,8 @@ pytest --cov=app
 # Run specific test function
 pytest tests/test_bright_data.py::TestBrightDataClient::test_search_success
 
-# Phase 2 Integration Testing
-python scripts/test_phase2_integration.py
-
-# Phase 2.5 Integration Testing  
-python scripts/test_phase25_integration.py
-
-# Run individual test scripts
-python scripts/test_batch_linkedin.py
-python scripts/test_linkedin_queries.py
-
-# New Phase 2 test files
+# Core test files
 pytest tests/test_crawl4ai_client.py
-pytest tests/test_instagram_service.py  
-pytest tests/test_link_validation_service.py
-pytest tests/test_company_analysis_service.py
 ```
 
 ### Environment Setup
@@ -111,11 +98,6 @@ async with SERPService() as serp_service:
 - **BatchPaginationRequest/Response**: Multi-page search operations
 - **PaginationMetadata**: Rich pagination state management
 - **CrawlRequest/CrawlResponse**: Web crawling operations with Crawl4ai
-- **InstagramAnalysisRequest/Response**: Instagram business profile analysis
-- **InstagramSearchRequest/Response**: Instagram business search query generation
-- **BusinessIndicators**: Business pattern detection with confidence scoring
-- **LinkAnalysis**: Link extraction and validation results
-- **KeywordExtraction**: Content keyword analysis with semantic grouping
 - Field validators for country codes (2-letter uppercase) and language codes (2-letter lowercase)
 - Advanced pagination with continuation tokens and metadata tracking
 
@@ -123,9 +105,6 @@ async with SERPService() as serp_service:
 - **BrightDataClient**: HTTP client with retry logic, rate limiting, and connection pooling
 - **Crawl4aiClient**: AsyncWebCrawler wrapper with browser lifecycle management and timeout handling
 - **GoogleSERPParser**: CSS selector-based HTML parsing for search results
-- **InstagramSearchService**: Business-focused Instagram profile analysis with pattern recognition
-- **LinkValidationService**: Link extraction and validation with business relevance scoring
-- **KeywordExtractionService**: TF-IDF-based keyword extraction with semantic grouping
 - **Resource Management**: Proper async context managers and connection cleanup
 - **Error Translation**: API errors mapped to domain-specific exceptions
 
@@ -155,8 +134,7 @@ Structured logging with operation decorators for request/response tracking and p
 
 ## Phase Development Status
 **Phase 1**: ✅ Complete - Basic SERP search via Bright Data API with batch pagination
-**Phase 2**: ✅ Complete - Intelligent Content Analysis with Crawl4ai integration, Instagram business analysis, and comprehensive content extraction
-**Phase 2.5**: 🚧 In Progress - Company Analysis & Employee Discovery pipeline with LinkedIn integration  
+**Phase 2**: ✅ Complete - Basic web crawling with Crawl4ai integration for general content extraction
 **Phase 3**: Planned - Workflow Strategy Engine with parallel search execution
 **Phase 4**: Planned - Redis caching and performance optimization
 
@@ -226,12 +204,6 @@ crawl4ai_GoogleSERP/
 ### Phase 2 Content Analysis Endpoints  
 - **POST /api/v1/crawl**: Basic web crawling with Crawl4ai integration
 - **GET /api/v1/crawl/test**: Health check endpoint for crawling functionality
-- **POST /api/v1/analyze/instagram**: Comprehensive Instagram profile analysis with business indicators, link validation, and keyword extraction
-- **POST /api/v1/search/instagram**: Generate optimized Instagram business search queries
-
-### Phase 2.5 Company Analysis Endpoints
-- **POST /api/v1/company/analyze**: Company profile analysis and employee discovery
-- **POST /api/v1/company/search**: Generate optimized company search queries
 
 ## Development Guidelines
 

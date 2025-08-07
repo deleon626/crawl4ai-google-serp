@@ -55,6 +55,12 @@ def make_api_request(endpoint: str, method: str = "GET", data: Dict = None, time
 
 def render_sidebar_config():
     """Render sidebar configuration section."""
+    # Home Navigation
+    st.sidebar.header("🏠 Navigation")
+    st.sidebar.markdown("🏠 **[Home](/)** - Return to main page")
+    
+    st.sidebar.markdown("---")
+    
     st.sidebar.header("⚙️ Configuration")
     
     # API Configuration

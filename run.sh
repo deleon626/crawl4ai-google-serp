@@ -35,8 +35,8 @@ if [[ ! -f "main.py" ]]; then
     exit 1
 fi
 
-if [[ ! -f "frontend/streamlit_app.py" ]]; then
-    echo "❌ frontend/streamlit_app.py not found. Make sure you're in the project root directory."
+if [[ ! -f "frontend/🏠_Home.py" ]]; then
+    echo "❌ frontend/🏠_Home.py not found. Make sure you're in the project root directory."
     exit 1
 fi
 
@@ -77,16 +77,16 @@ echo "🎨 Starting Streamlit frontend..."
 echo "   Frontend will be available at: http://localhost:8501"
 
 # Start Streamlit frontend in background
-uv run streamlit run frontend/streamlit_app.py --server.headless true --server.runOnSave true &
+uv run streamlit run frontend/🏠_Home.py --server.headless true --server.runOnSave true &
 FRONTEND_PID=$!
 
 echo ""
 echo "✅ Both services are starting up..."
 echo "=================================="
-echo "🌐 Multi-Platform Social Media Search:"
-echo "   📱 Instagram: All, Reels, Posts, Accounts, TV, Locations (6 filters)"
-echo "   💼 LinkedIn: All, Profiles, Companies, Posts, Jobs, Articles (6 filters)"
-echo "   🔍 Query Preview: Real-time modified query display with Google URLs"
+echo "🔍 SERP Parser & Business Intelligence Platform:"
+echo "   📱 Instagram Business Analysis: Profile detection, contact extraction, keyword analysis"
+echo "   🏢 Company Research: Website discovery, employee extraction, technology identification"
+echo "   📊 Analytics Dashboard: Performance metrics, API health monitoring, cross-platform insights"
 echo ""
 echo "🌐 URLs:"
 echo "   • Streamlit Frontend: http://localhost:8501"

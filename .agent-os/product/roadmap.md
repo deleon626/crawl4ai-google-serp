@@ -21,25 +21,20 @@
 - Python 3.8+ environment
 - FastAPI framework setup
 
-## Phase 2: Intelligent Content Analysis ✅
+## Phase 2: Basic Web Crawling ✅ 
 
-**Goal:** Implement Crawl4ai integration with content pattern recognition
-**Success Criteria:** Content extraction working for Instagram profiles, bio analysis functional
+**Goal:** Implement Crawl4ai integration for general web content extraction
+**Success Criteria:** Content extraction working for arbitrary URLs, basic content analysis functional
 
 ### Features
 
 - [x] Crawl4ai AsyncWebCrawler integration - Web content processing engine with browser automation `L`
-- [x] Instagram search query modifiers - Specialized profile discovery with business pattern detection `M`
-- [x] Bio pattern analysis - Extract business indicators from profile text with confidence scoring `L`
-- [x] Link extraction and validation - Identify business links in bios with async validation `M`
-- [x] Content keyword consolidation - Automated keyword extraction and grouping with TF-IDF scoring `L`
-- [x] Enhanced search endpoints - Content analysis integrated with SERP data via new API endpoints `M`
+- [x] Basic content extraction - Clean text and structured data extraction from web pages `M`
+- [x] Enhanced crawling endpoints - Content analysis integrated with SERP data via new API endpoints `M`
 
 ### Dependencies
 
 - [x] Crawl4ai library integration - Complete with AsyncWebCrawler support
-- [x] Instagram search pattern research - Business detection patterns implemented
-- [x] Bio content analysis algorithms - Regex patterns and confidence scoring deployed
 
 ## Phase 3: Workflow Strategy Engine
 
@@ -61,26 +56,16 @@
 - Pattern matching algorithm development
 - Parallel processing optimization
 
-## Phase 2.5: Company Analysis & Employee Discovery
+## Phase 2.5: Advanced Content Analysis [REMOVED]
 
-**Goal:** Implement comprehensive company analysis with automated employee discovery
-**Success Criteria:** Company input → website discovery → employee identification pipeline operational
+**Status:** Features removed from codebase - returned to Phase 1 core functionality
 
-### Features
+### Rationale
 
-- [ ] Multi-page Streamlit interface - Navigation from Instagram results to company analysis `M`
-- [ ] Company analysis API endpoint - Input company name/LinkedIn profile processing `L`
-- [ ] Website discovery via SERP - Automated company website identification `M`
-- [ ] Company website crawling - Comprehensive Crawl4ai content extraction `L`
-- [ ] Employee discovery pipeline - Identify company employees from website content `XL`
-- [ ] LinkedIn integration preparation - Architecture for ApiFy API integration `M`
-- [ ] Company data structuring - Organized employee and company information output `L`
-
-### Dependencies
-
-- Phase 2 Crawl4ai integration completion
-- Streamlit multi-page architecture
-- Employee identification algorithms
+- Instagram business analysis features removed
+- Company analysis and employee discovery features removed  
+- Streamlined application focused on core SERP + basic crawling functionality
+- Simplified codebase for better maintainability
 
 ## Phase 4: Performance & Scaling
 

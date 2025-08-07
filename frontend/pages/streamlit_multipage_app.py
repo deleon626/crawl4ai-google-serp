@@ -29,7 +29,7 @@ def init_session_state():
     defaults = {
         'api_url': API_BASE_URL,
         'connection_status': None,
-        'current_page': 'SERP Search',
+        'current_page': 'Instagram Analysis',
         'search_results': None,
         'instagram_results': None,
         'company_results': None
@@ -98,7 +98,6 @@ def render_sidebar():
     # Page Navigation
     st.sidebar.header("📄 Pages")
     pages = [
-        "🔍 SERP Search",
         "📱 Instagram Analysis", 
         "🏢 Company Analysis",
         "📊 Analytics Dashboard"
@@ -110,90 +109,6 @@ def render_sidebar():
     return selected_page
 
 # Page Components
-def render_serp_search_page():
-    """Render SERP search functionality page."""
-    st.title("🔍 SERP Search")
-    st.markdown("Search Google with advanced filtering and pagination options.")
-    
-    with st.form("serp_search_form"):
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            query = st.text_input("Search Query", placeholder="Enter your search query...")
-            
-        with col2:
-            search_mode = st.selectbox("Search Mode", ["Single Page", "Batch Pagination"])
-        
-        col3, col4, col5 = st.columns(3)
-        with col3:
-            country = st.selectbox("Country", ["US", "ID", "UK", "DE", "FR", "JP", "CA", "AU"])
-        with col4:
-            language = st.selectbox("Language", ["en", "es", "fr", "de", "ja", "zh"])
-        with col5:
-            num_results = st.selectbox("Results per Page", [10, 20, 30, 50])
-        
-        if search_mode == "Batch Pagination":
-            col6, col7 = st.columns(2)
-            with col6:
-                max_pages = st.slider("Max Pages", 1, 10, 3)
-            with col7:
-                delay_seconds = st.slider("Delay Between Requests (seconds)", 1, 10, 2)
-        
-        submitted = st.form_submit_button("🔍 Search", type="primary")
-        
-        if submitted and query:
-            with st.spinner("Searching..."):
-                if search_mode == "Single Page":
-                    endpoint = "/api/v1/search"
-                    data = {
-                        "query": query,
-                        "country": country,
-                        "language": language, 
-                        "num_results": num_results
-                    }
-                else:
-                    endpoint = "/api/v1/search/batch-pagination"
-                    data = {
-                        "query": query,
-                        "country": country,
-                        "language": language,
-                        "num_results": num_results,
-                        "max_pages": max_pages,
-                        "delay_seconds": delay_seconds
-                    }
-                
-                result = make_api_request(endpoint, "POST", data, timeout=60)
-                st.session_state.search_results = result
-                st.rerun()
-    
-    # Display Results
-    if st.session_state.search_results:
-        result = st.session_state.search_results
-        
-        if result["success"]:
-            data = result["data"]
-            st.success(f"✅ Search completed successfully!")
-            
-            # Display metadata
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Results", data.get("total_results", "N/A"))
-            with col2:
-                st.metric("Processing Time", f"{data.get('processing_time_seconds', 0):.2f}s")
-            with col3:
-                st.metric("Results Returned", len(data.get("results", [])))
-            
-            # Display results
-            if data.get("results"):
-                st.subheader("Search Results")
-                for i, result in enumerate(data["results"], 1):
-                    with st.expander(f"{i}. {result.get('title', 'No Title')}"):
-                        st.write(f"**URL:** {result.get('link', 'N/A')}")
-                        st.write(f"**Snippet:** {result.get('snippet', 'No snippet available')}")
-                        if result.get('displayed_link'):
-                            st.write(f"**Displayed Link:** {result['displayed_link']}")
-        else:
-            st.error(f"❌ Search failed: {result['error']}")
 
 def render_instagram_analysis_page():
     """Render Instagram analysis functionality page.""" 
@@ -591,22 +506,18 @@ def render_analytics_dashboard():
     st.markdown("Overview of recent analyses and insights.")
     
     # Summary Cards
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        search_count = 1 if st.session_state.search_results else 0
-        st.metric("SERP Searches", search_count)
-    
-    with col2:
         instagram_count = 1 if st.session_state.instagram_results else 0
         st.metric("Instagram Analyses", instagram_count)
     
-    with col3:
+    with col2:
         company_count = 1 if st.session_state.company_results else 0
         st.metric("Company Analyses", company_count)
     
-    with col4:
-        total_analyses = search_count + instagram_count + company_count
+    with col3:
+        total_analyses = instagram_count + company_count
         st.metric("Total Analyses", total_analyses)
     
     # Recent Results Summary
@@ -615,15 +526,6 @@ def render_analytics_dashboard():
         
         # Create summary data
         summary_data = []
-        
-        if st.session_state.search_results and st.session_state.search_results["success"]:
-            data = st.session_state.search_results["data"]
-            summary_data.append({
-                'Type': 'SERP Search',
-                'Status': '✅ Success',
-                'Results': len(data.get('results', [])),
-                'Processing Time': f"{data.get('processing_time_seconds', 0):.2f}s"
-            })
         
         if st.session_state.instagram_results and st.session_state.instagram_results["success"]:
             result = st.session_state.instagram_results
@@ -681,9 +583,7 @@ def main():
     selected_page = render_sidebar()
     
     # Render selected page
-    if "SERP Search" in selected_page:
-        render_serp_search_page()
-    elif "Instagram Analysis" in selected_page:
+    if "Instagram Analysis" in selected_page:
         render_instagram_analysis_page()
     elif "Company Analysis" in selected_page:
         render_company_analysis_page()
