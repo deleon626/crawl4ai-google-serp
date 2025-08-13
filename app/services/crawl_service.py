@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 from app.clients.crawl4ai_client import Crawl4aiClient
 from app.models.crawl import CrawlRequest, CrawlResponse, CrawlResult
 from app.utils.logging_decorators import log_operation
+from app.utils.robots_compliance import robots_manager
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class CrawlService:
     @log_operation("crawl_url")
     async def crawl(self, request: CrawlRequest) -> CrawlResponse:
         """
-        Crawl a URL using Crawl4ai.
+        Crawl a URL using Crawl4ai with robots.txt compliance.
         
         Args:
             request: Crawl request parameters
@@ -39,20 +40,46 @@ class CrawlService:
         Returns:
             CrawlResponse with crawl results
         """
-        logger.info(f"Crawling URL: {request.url}")
+        url = str(request.url)
+        logger.info(f"Crawling URL with security compliance: {url}")
         
         try:
-            # Perform crawling using client
-            client_result = await self.crawl4ai_client.crawl_url(
-                url=str(request.url),
-                include_raw_html=request.include_raw_html or False,
-                word_count_threshold=request.word_count_threshold or 10,
-                extraction_strategy=request.extraction_strategy or "NoExtractionStrategy",
-                chunking_strategy=request.chunking_strategy or "RegexChunking",
-                css_selector=request.css_selector,
-                user_agent=request.user_agent,
-                headers=request.headers
-            )
+            # Check robots.txt compliance
+            async with robots_manager as compliance_checker:
+                can_crawl, reason, delay = await compliance_checker.can_crawl_now(url)
+                
+                if not can_crawl:
+                    logger.warning(f"Crawl blocked by robots.txt compliance: {reason}")
+                    return CrawlResponse(
+                        success=False,
+                        error_message=f"Crawl blocked by robots.txt compliance: {reason}",
+                        crawl_result=None
+                    )
+                
+                # Wait if required by robots.txt
+                if delay > 0:
+                    await compliance_checker.wait_if_needed(url)
+                
+                # Get respectful user agent
+                user_agent = compliance_checker.get_respectful_user_agent()
+                
+                # Perform crawling using client with compliance
+                headers = request.headers or {}
+                headers['User-Agent'] = user_agent  # Use respectful user agent
+                
+                client_result = await self.crawl4ai_client.crawl_url(
+                    url=url,
+                    include_raw_html=request.include_raw_html or False,
+                    word_count_threshold=request.word_count_threshold or 10,
+                    extraction_strategy=request.extraction_strategy or "NoExtractionStrategy",
+                    chunking_strategy=request.chunking_strategy or "RegexChunking",
+                    css_selector=request.css_selector,
+                    user_agent=user_agent,
+                    headers=headers
+                )
+                
+                # Record successful crawl for compliance tracking
+                await compliance_checker.record_successful_crawl(url)
             
             # Parse result data if successful
             crawl_result = None
@@ -68,21 +95,23 @@ class CrawlService:
                     metadata=result_data.get("metadata", {})
                 )
             
-            # Create response
-            response = CrawlResponse(
-                success=client_result.get("success", False),
-                url=request.url,
-                result=crawl_result,
-                error=client_result.get("error"),
-                execution_time=client_result.get("execution_time", 0.0)
-            )
-            
-            if response.success:
-                logger.info(f"Successfully crawled {request.url} in {response.execution_time:.2f}s")
-            else:
-                logger.warning(f"Crawl failed for {request.url}: {response.error}")
-            
-            return response
+                # Create response
+                response = CrawlResponse(
+                    success=client_result.get("success", False),
+                    url=request.url,
+                    result=crawl_result,
+                    error=client_result.get("error"),
+                    execution_time=client_result.get("execution_time", 0.0)
+                )
+                
+                if response.success:
+                    logger.info(f"Successfully crawled {request.url} with robots.txt compliance in {response.execution_time:.2f}s")
+                else:
+                    logger.warning(f"Crawl failed for {request.url}: {response.error}")
+                    # Record failed crawl for compliance tracking
+                    await compliance_checker.record_failed_crawl(url, status_code=None)
+                
+                return response
             
         except Exception as e:
             error_msg = f"CrawlService error for {request.url}: {str(e)}"

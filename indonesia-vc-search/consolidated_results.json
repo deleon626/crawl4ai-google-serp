@@ -1,0 +1,38 @@
+{
+  "search_metadata": {
+    "timestamp": "2025-08-12T10:54:47Z",
+    "total_searches": 5,
+    "queries": [
+      "venture capital funded companies Indonesia",
+      "startup Indonesia VC funding Series A B C",
+      "Indonesia unicorn companies Gojek Tokopedia Traveloka", 
+      "Indonesian fintech companies venture capital investment",
+      "Jakarta startup ecosystem venture capital 2024"
+    ],
+    "country": "ID",
+    "language": "en"
+  },
+  "key_findings": {
+    "top_vc_firms": [
+      "East Ventures",
+      "AC Ventures", 
+      "Alpha JWC Ventures",
+      "MDI Ventures",
+      "Insignia Ventures Partners",
+      "BEENEXT",
+      "Y Combinator",
+      "Antler",
+      "500 Durian",
+      "Sequoia Capital"
+    ],
+    "major_companies": [
+      "Gojek",
+      "Tokopedia", 
+      "Traveloka",
+      "Bukalapak",
+      "Ovo",
+      "Dana"
+    ]
+  },
+  "search_results_summary": "Found comprehensive data on Indonesia's VC ecosystem including top 15 most active VCs, unicorn companies, fintech investments, and Jakarta startup ecosystem. Results indicate East Ventures as the most active VC firm with 300+ portfolio companies."
+}

@@ -90,7 +90,6 @@ class Crawl4aiClient:
                 only_text=not include_raw_html,
                 css_selector=css_selector,
                 user_agent=user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                headers=headers or {},
                 extraction_strategy=self._get_extraction_strategy(extraction_strategy),
                 chunking_strategy=self._get_chunking_strategy(chunking_strategy)
             )

@@ -5,6 +5,8 @@ import time
 from typing import Dict, Any, Optional
 from app.clients.bright_data import BrightDataClient, BrightDataError
 from app.models.serp import SearchRequest, SearchResponse, SocialPlatform, InstagramContentType, LinkedInContentType
+from app.utils.caching import get_cache_service
+from app.utils.performance import get_performance_monitor
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -16,6 +18,8 @@ class SERPService:
     def __init__(self):
         """Initialize SERP service."""
         self.bright_data_client = None
+        self.cache_service = None
+        self.performance_monitor = None
         logger.info("SERP service initialized")
     
     async def search(self, search_request: SearchRequest) -> SearchResponse:
@@ -46,6 +50,50 @@ class SERPService:
             # Apply social platform filtering to query
             modified_request = await self._apply_social_platform_filter(search_request)
             
+            # Check cache first if available
+            if self.cache_service:
+                cached_result = await self.cache_service.get_serp_results(
+                    modified_request.query,
+                    modified_request.country,
+                    modified_request.language,
+                    modified_request.page
+                )
+                
+                if cached_result:
+                    logger.info(f"Cache hit for SERP query: '{modified_request.query}'")
+                    
+                    # Record cache hit metric
+                    if self.performance_monitor:
+                        await self.performance_monitor.record_metric(
+                            "serp_cache_hits", 1.0, "count", 
+                            {"query": modified_request.query[:50], "country": modified_request.country}
+                        )
+                    
+                    try:
+                        # Convert cached data back to SearchResponse
+                        search_response = SearchResponse(**cached_result)
+                        
+                        # Record processing time for cache hit
+                        processing_time = time.time() - start_time
+                        if self.performance_monitor:
+                            await self.performance_monitor.record_metric(
+                                "serp_response_time", processing_time, "seconds",
+                                {"cached": "true", "query": modified_request.query[:50]}
+                            )
+                        
+                        return search_response
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to parse cached SERP data: {e}")
+                        # Continue with API call
+                
+                # Record cache miss metric
+                if self.performance_monitor:
+                    await self.performance_monitor.record_metric(
+                        "serp_cache_misses", 1.0, "count", 
+                        {"query": modified_request.query[:50], "country": modified_request.country}
+                    )
+            
             # Perform search using Bright Data client
             search_response = await self.bright_data_client.search(modified_request)
             
@@ -72,6 +120,31 @@ class SERPService:
             
             logger.info(f"Search completed in {search_time:.3f}s with "
                        f"{enhanced_response.results_count} results")
+            
+            # Cache successful search results if caching available
+            if self.cache_service and enhanced_response.results_count > 0:
+                try:
+                    await self.cache_service.set_serp_results(
+                        modified_request.query,
+                        modified_request.country,
+                        modified_request.language,
+                        enhanced_response,
+                        modified_request.page
+                    )
+                    logger.debug(f"Cached SERP results for query: '{modified_request.query}'")
+                except Exception as e:
+                    logger.warning(f"Failed to cache SERP results: {e}")
+            
+            # Record performance metrics
+            if self.performance_monitor:
+                await self.performance_monitor.record_metric(
+                    "serp_response_time", search_time, "seconds",
+                    {"cached": "false", "query": modified_request.query[:50], "results": str(enhanced_response.results_count)}
+                )
+                await self.performance_monitor.record_metric(
+                    "serp_results_count", float(enhanced_response.results_count), "count",
+                    {"query": modified_request.query[:50]}
+                )
             
             return enhanced_response
             
@@ -272,6 +345,16 @@ class SERPService:
     async def __aenter__(self):
         """Async context manager entry - initialize heavy resources."""
         self.bright_data_client = BrightDataClient()
+        
+        # Initialize caching and performance monitoring
+        try:
+            self.cache_service = await get_cache_service()
+            self.performance_monitor = await get_performance_monitor()
+            logger.debug("SERP service caching and performance monitoring initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize SERP caching/performance monitoring: {e}")
+            # Continue without caching/monitoring
+        
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):

@@ -23,7 +23,8 @@
       "Bash(cd:*)",
       "Bash(cd:*)",
       "Bash(cd:*)",
-      "Bash(timeout 10s uv run:*)"
+      "Bash(timeout 10s uv run:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }
